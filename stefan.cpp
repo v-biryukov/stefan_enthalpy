@@ -182,39 +182,83 @@ class solver2d
 		double * b = new double[num_x];
 		double * c = new double[num_x];
 		double * f = new double[num_x];
+		double * x = new double[num_x];
 
-		for (int i = 1; i < num_y-1; ++i)
+		int idx1_p, idx1_c, idx1_m;
+		int idx2_p, idx2_c, idx2_m;
+		int num_1, num_2;
+		double h1, h2;
+
+		double * E = current_iteration_data;
+		if (axis == 0)
 		{
-			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 100.0;
-			a[num_x-1] = -1.0; b[num_x-1] = 1.0; c[num_x-1] = 0.0; f[num_x-1] = 0.0;
-			double * E = current_iteration_data + i*num_x;
+			idx1_p = 1;
+			idx1_c = 0;
+			idx1_m = -1;
+			idx2_p = num_x;
+			idx2_c = 0;
+			idx2_m = -num_x;
+			num_1 = num_x; num_2 = num_y;
+			h1 = hx; h2 = hy;
+		}
+		else if (axis == 1)
+		{
+			idx1_p = num_x;
+			idx1_c = 0;
+			idx1_m = -num_x;
+			idx2_p = 1;
+			idx2_c = 0;
+			idx2_m = -1;
+			num_1 = num_y; num_2 = num_x;
+			h1 = hy; h2 = hx;
+		}
 
-			for (int n = 1; n < num_x-1; ++n)
+		for (int i2 = 1; i2 < num_2-1; ++i2)
+		{
+			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
+			a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
+			
+
+			for (int i1 = 1; i1 < num_1-1; ++i1)
 			{
-				double kp = (mi.get_thermal_conductivity_by_E(E[n+1]) + mi.get_thermal_conductivity_by_E(E[n])) / 2.0;
-				double km = (mi.get_thermal_conductivity_by_E(E[n]) + mi.get_thermal_conductivity_by_E(E[n-1])) / 2.0;
+				int ix = axis ? i2 : i1;
+				int iy = axis ? i1 : i2;
+				double * E_iter = current_iteration_data + ix + iy*num_x;
+				const double * E_step = enthalpy_data + ix + iy*num_x;
+
+				double kp = (mi.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
+				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
 
 
-				double coef = -dt / (2.0 * hx * hx);
-				a[n] = coef * mi.get_alpha(E[n-1]) * km;
-				b[n] = 1.0 - coef * mi.get_alpha(E[n]) * (km + kp);
-				c[n] = coef * mi.get_alpha(E[n+1]) * kp;
-				f[n] = enthalpy_data[n+i*num_x] - coef * (mi.get_beta(E[n-1])*km - mi.get_beta(E[n])*(km+kp) + mi.get_beta(E[n+1])*kp);
+				double coef = -dt / (2.0 * h1 * h1);
+				a[i1] = coef * mi.get_alpha(E_iter[idx1_m]) * km;
+				b[i1] = 1.0 - coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
+				c[i1] = coef * mi.get_alpha(E_iter[idx1_p]) * kp;
+				f[i1] = E_step[idx1_c] - coef * (mi.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mi.get_beta(E_iter[idx1_p])*kp);
 
 
-				double kyp = (mi.get_thermal_conductivity_by_E(enthalpy_data[n + (i+1)*num_x]) + mi.get_thermal_conductivity_by_E(enthalpy_data[n + (i)*num_x])) / 2.0;
-				double kyn = (mi.get_thermal_conductivity_by_E(enthalpy_data[n + (i-1)*num_x]) + mi.get_thermal_conductivity_by_E(enthalpy_data[n + (i)*num_x])) / 2.0;
-				double Tnp = mi.get_T_by_enthalpy(enthalpy_data[n+(i+1)*num_x]) - mi.get_T_by_enthalpy(enthalpy_data[n+(i)*num_x]);
-				double Tnn = mi.get_T_by_enthalpy(enthalpy_data[n+(i-1)*num_x]) - mi.get_T_by_enthalpy(enthalpy_data[n+(i)*num_x]);
-				f[n] += kyp * Tnp * dt/(2*hy*hy) + kyn * Tnn * dt/(2*hy*hy);
+				double k2p = (mi.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				double k2n = (mi.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				double T2p = mi.get_T_by_enthalpy(E_step[idx2_p]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				double T2n = mi.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
-			solve_triadiagonal(num_x, a, b, c, f, next_iteration_data + i*num_x);
+
+			solve_triadiagonal(num_1, a, b, c, f, x);
+
+			if (axis == 0)
+				for (int k = 0; k < num_1; ++k)
+					next_iteration_data[k + i2*num_x] = x[k];
+			else if (axis == 1)
+				for (int k = 0; k < num_1; ++k)
+					next_iteration_data[i2 + k*num_x] = x[k];
 		}
 
 		delete [] a;
 		delete [] b;
 		delete [] c;
 		delete [] f;
+		delete [] x;
 	}
 
 	void solve_triadiagonal (int n, double *a, double *b, double *c, double *f, double *x)
@@ -309,7 +353,7 @@ public:
 	void step(double dt)
 	{
 		step(0, dt);
-		//step(1, dt);
+		step(1, dt);
 	}
 
 	void save_to_vtk(std::string name)
@@ -345,6 +389,21 @@ public:
 			{
 	        	vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[i + j*num_x]) << "\n";
 	    	}
+	    vtk_file << "SCALARS state FLOAT\n";
+	    vtk_file << "LOOKUP_TABLE default\n";
+	    for (int i = 0; i < num_x; i++)
+			for (int j = 0; j < num_y; j++)
+			{
+				double T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
+				double state;
+				if (T < mi.T1)
+					state = 0.0;
+				else if (T < mi.T2)
+					state = (T-mi.T1)/(mi.T2-mi.T1);
+				else
+					state = 1.0;
+	        	vtk_file <<  state << "\n";
+	    	}
 	}
 
 
@@ -354,14 +413,15 @@ int main()
 {
 	int num_x = 100;
 	int num_y = 100;
-	material_info mi = material_info(272.0, 274.0, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
+	material_info mi = material_info(273.1, 273.2, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
 	double * td = new double [num_x * num_y];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			if (n > 35 && n < 65 && i > 10 && i < 40)
+			if ((n > 15 && n < 25 && i > 10 && i < 90) || (n > 45 && n < 55 && i > 10 && i < 90) || (n > 75 && n < 85 && i > 10 && i < 90)
+				|| (n > 10 && n < 90 && i > 15 && i < 25) || (n > 10 && n < 90 && i > 45 && i < 55) || (n > 10 && n < 90 && i > 75 && i < 85))
 			{
-				td[n + i*num_x] = 250.0;
+				td[n + i*num_x] = 273.0;
 			}
 			else
 			{
@@ -369,7 +429,7 @@ int main()
 			}
 		}
 	solver2d sol = solver2d(num_x, num_y, 5.0, 5.0, mi, td);
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 100000; ++i)
 	{
 		if (i%10 == 0)
 		{
@@ -378,7 +438,7 @@ int main()
 	        ss << i;
 	        sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
     	}
-		sol.step(500);	
+		sol.step(1000);	
 	}
 	delete [] td;
 	return 0;
