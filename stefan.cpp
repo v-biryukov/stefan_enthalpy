@@ -42,10 +42,11 @@ struct material_info
 
 	double get_T_by_enthalpy(double enthalpy)
 	{
-		double b = get_b();
-		if (enthalpy < b * T1)
-			return enthalpy / b;
-		else if (enthalpy < get_r1() * T2 + get_r2())
+		double E1 = get_b() * T1;
+		double E2 = get_r1() * T2 + get_r2();
+		if (enthalpy < E1)
+			return enthalpy / get_b();
+		else if (enthalpy < E2)
 			return (enthalpy + get_p2()) / get_p1();
 		else 
 			return (enthalpy - get_r2()) / get_r1();
@@ -66,8 +67,8 @@ struct material_info
 
 	double get_alpha(double enthalpy)
 	{
-		double E1 = rho_S * thermal_conductivity_S * T1;
-		double E2 = rho_S * thermal_conductivity_S * T2 + rho_S * specific_heat_fusion;
+		double E1 = get_b() * T1;
+		double E2 = get_r1() * T2 + get_r2();
 		if (enthalpy < E1)
 			return 1.0 / get_b();
 		else if (enthalpy < E2)
@@ -79,8 +80,8 @@ struct material_info
 
 	double get_beta(double enthalpy)
 	{
-		double E1 = rho_S * thermal_conductivity_S * T1;
-		double E2 = rho_S * thermal_conductivity_S * T2 + rho_S * specific_heat_fusion;
+		double E1 = get_b() * T1;
+		double E2 = get_r1() * T2 + get_r2();
 		if (enthalpy < E1)
 			return 0.0;
 		else if (enthalpy < E2)
@@ -318,11 +319,11 @@ class solver2d
 		double L2_norm = 1.0;
 
 		assign(next_iteration_data, enthalpy_data);
-		while (L2_norm > 1e-3)
+		while (L2_norm > 5e-3)
 		{
 			assign(current_iteration_data, next_iteration_data);
 			iterate_tridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
-			L2_norm = calculate_L2_norm(current_iteration_data, next_iteration_data);
+			L2_norm = calculate_L2_norm(current_iteration_data, next_iteration_data) / calculate_L2_norm(current_iteration_data);
 			//std::cout << "L2 = " << L2_norm << std::endl;
 		}
 		assign(enthalpy_data, next_iteration_data);
@@ -413,15 +414,16 @@ int main()
 {
 	int num_x = 100;
 	int num_y = 100;
-	material_info mi = material_info(273.1, 273.2, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
+	material_info mi = material_info(273.0, 274.0, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
 	double * td = new double [num_x * num_y];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			if ((n > 15 && n < 25 && i > 10 && i < 90) || (n > 45 && n < 55 && i > 10 && i < 90) || (n > 75 && n < 85 && i > 10 && i < 90)
-				|| (n > 10 && n < 90 && i > 15 && i < 25) || (n > 10 && n < 90 && i > 45 && i < 55) || (n > 10 && n < 90 && i > 75 && i < 85))
+			//if ((n > 15 && n < 25 && i > 10 && i < 90) || (n > 45 && n < 55 && i > 10 && i < 90) || (n > 75 && n < 85 && i > 10 && i < 90)
+			//	|| (n > 10 && n < 90 && i > 15 && i < 25) || (n > 10 && n < 90 && i > 45 && i < 55) || (n > 10 && n < 90 && i > 75 && i < 85))
+			if ((n > 30 && n < 70 && i > 30 && i < 70))
 			{
-				td[n + i*num_x] = 273.0;
+				td[n + i*num_x] = 70.0;
 			}
 			else
 			{
