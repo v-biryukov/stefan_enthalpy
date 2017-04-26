@@ -3,6 +3,9 @@
 #include <sstream>
 #include <fstream>
 #include <math.h>
+#include <vector>
+#include <functional>
+
 
 
 
@@ -119,7 +122,7 @@ private:
 };
 
 
-class solver2d
+class mesh2d
 {
 	int num_x;
 	int num_y;
@@ -128,7 +131,42 @@ class solver2d
 	double Ly;
 	double hx;
 	double hy;
-	material_info mi;
+
+
+	std::vector<material_info> material_infos;
+	std::function<int(double, double)> material_index;
+
+public:
+
+	mesh2d()
+	{
+	}
+	mesh2d(int num_x, int num_y, double Lx, double Ly, std::vector<material_info> material_infos, std::function<int(double, double)> material_index) 
+		: num_x(num_x), num_y(num_y), Lx(Lx), Ly(Ly), material_infos(material_infos), material_index(material_index)
+	{
+		hx = Lx / (num_x-1);
+		hy = Ly / (num_y-1);
+		number_of_nodes = num_x * num_y;
+	}
+
+	material_info & get_material(int n, int i)
+	{
+		return material_infos[material_index(n*hx, i*hy)];
+	}
+
+	inline double get_Lx() {return Lx;}
+	inline double get_Ly() {return Ly;}
+	inline double get_hx() {return hx;}
+	inline double get_hy() {return hy;}
+	inline int get_num_x() {return num_x;}
+	inline int get_num_y() {return num_y;}
+	inline int get_number_of_nodes() {return number_of_nodes;}
+};
+
+
+class solver2d
+{
+	mesh2d mesh;
 
 	double * enthalpy_data;
 	double * current_iteration_data;
@@ -136,11 +174,13 @@ class solver2d
 
 
 
-	void set_enthalpy_by_T_data(material_info & mi, const double * temperature_data)
+	void set_enthalpy_by_T_data(const double * temperature_data)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
-				enthalpy_data[n + i * num_x] = mi.get_enthalpy_by_T(temperature_data[n + i * num_x]);
+				enthalpy_data[n + i * num_x] = mesh.get_material(n, i).get_enthalpy_by_T(temperature_data[n + i * num_x]);
 	}
 
 
@@ -159,9 +199,15 @@ class solver2d
 			Ey = current_iteration_data;
 		}
 
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
+		double hx = mesh.get_hx();
+		double hy = mesh.get_hy();
+
 		for (int n = 1; n < num_x-1; ++n)
 			for (int i = 1; i < num_y-1; ++i)
 			{
+				material_info & mi = mesh.get_material(n, i);
 				double k1 = (mi.get_thermal_conductivity_by_E(Ex[n+1 + i*num_x]) + mi.get_thermal_conductivity_by_E(Ex[n + i*num_x])) / 2.0;
 				double k2 = (mi.get_thermal_conductivity_by_E(Ex[n + i*num_x]) + mi.get_thermal_conductivity_by_E(Ex[n-1 + i*num_x])) / 2.0;
 				double Tn1 = (mi.get_T_by_enthalpy(Ex[n+1 + i*num_x]) - mi.get_T_by_enthalpy(Ex[n + i*num_x])) / hx;
@@ -189,22 +235,22 @@ class solver2d
 			idx1_p = 1;
 			idx1_c = 0;
 			idx1_m = -1;
-			idx2_p = num_x;
+			idx2_p = mesh.get_num_x();
 			idx2_c = 0;
-			idx2_m = -num_x;
-			num_1 = num_x; num_2 = num_y;
-			h1 = hx; h2 = hy;
+			idx2_m = -mesh.get_num_x();
+			num_1 = mesh.get_num_x(); num_2 = mesh.get_num_y();
+			h1 = mesh.get_hx(); h2 = mesh.get_hy();
 		}
 		else if (axis == 1)
 		{
-			idx1_p = num_x;
+			idx1_p = mesh.get_num_x();
 			idx1_c = 0;
-			idx1_m = -num_x;
+			idx1_m = -mesh.get_num_x();
 			idx2_p = 1;
 			idx2_c = 0;
 			idx2_m = -1;
-			num_1 = num_y; num_2 = num_x;
-			h1 = hy; h2 = hx;
+			num_1 = mesh.get_num_y(); num_2 = mesh.get_num_x();
+			h1 =  mesh.get_hy(); h2 = mesh.get_hx();
 		}
 
 		double * a = new double[num_1];
@@ -223,8 +269,10 @@ class solver2d
 			{
 				int ix = axis ? i2 : i1;
 				int iy = axis ? i1 : i2;
-				const double * E_iter = current_iteration_data + ix + iy*num_x;
-				const double * E_step = enthalpy_data + ix + iy*num_x;
+				const double * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
+				const double * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
+
+				material_info & mi = mesh.get_material(ix, iy);
 
 				double kp = (mi.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
 				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
@@ -248,10 +296,10 @@ class solver2d
 
 			if (axis == 0)
 				for (int k = 0; k < num_1; ++k)
-					next_iteration_data[k + i2*num_x] = x[k];
+					next_iteration_data[k + i2*mesh.get_num_x()] = x[k];
 			else if (axis == 1)
 				for (int k = 0; k < num_1; ++k)
-					next_iteration_data[i2 + k*num_x] = x[k];
+					next_iteration_data[i2 + k*mesh.get_num_x()] = x[k];
 		}
 
 		delete [] a;
@@ -280,6 +328,8 @@ class solver2d
 
 	double calculate_L2_norm(const double * A, const double * B)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		double L2 = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
@@ -292,6 +342,8 @@ class solver2d
 
 	double calculate_L2_norm(const double * A)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		double L2 = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
@@ -304,6 +356,8 @@ class solver2d
 
 	double calculate_Linf_norm(const double * A, const double * B)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		double Linf = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
@@ -317,6 +371,8 @@ class solver2d
 
 	double calculate_Linf_norm(const double * A)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		double Linf = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
@@ -330,6 +386,8 @@ class solver2d
 
 	double assign(double * A, const double * B)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
 			{
@@ -370,16 +428,13 @@ class solver2d
 
 
 public:
-	solver2d(int num_x, int num_y, double Lx, double Ly, material_info & mi, const double * temperature_data) 
-		: num_x(num_x), num_y(num_y), Lx(Lx), Ly(Ly), mi(mi)
+	solver2d(mesh2d & mesh, const double * temperature_data) 
 	{
-		hx = Lx / (num_x-1);
-		hy = Ly / (num_y-1);
-		number_of_nodes = num_x * num_y;
-		enthalpy_data = new double[number_of_nodes];
-		current_iteration_data = new double [number_of_nodes];
-		next_iteration_data = new double [number_of_nodes];
-		set_enthalpy_by_T_data(mi, temperature_data);
+		this->mesh = mesh;
+		enthalpy_data = new double[mesh.get_number_of_nodes()];
+		current_iteration_data = new double [mesh.get_number_of_nodes()];
+		next_iteration_data = new double [mesh.get_number_of_nodes()];
+		set_enthalpy_by_T_data(temperature_data);
 	}
 
 	~solver2d()
@@ -397,16 +452,19 @@ public:
 
 	void save_to_vtk(std::string name)
 	{
+		int num_x = mesh.get_num_x();
+		int num_y = mesh.get_num_y();
+
 		std::ofstream vtk_file(name.c_str());
 		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
-		vtk_file << "DATASET POLYDATA\nPOINTS " << number_of_nodes << " float\n";
-		for ( int i = 0; i < number_of_nodes; i++ )
-			vtk_file << (i/num_x) * hx << " " << (i%num_x) * hy << " "  << 0.0 << "\n";
+		vtk_file << "DATASET POLYDATA\nPOINTS " << num_x * num_y << " float\n";
+		for ( int i = 0; i < num_x * num_y; i++ )
+			vtk_file << (i/num_x) * mesh.get_hx() << " " << (i%num_x) * mesh.get_hy() << " "  << 0.0 << "\n";
 		vtk_file << "\nPOLYGONS " << (num_x-1)*(num_y-1) << " " << (num_x-1)*(num_y-1)*5 << "\n";
 		for (int i = 0; i < num_x-1; i++)
 			for (int j = 0; j < num_y-1; j++)
 				vtk_file << 4 << " " << i+j*num_x << " " << i+1+j*num_x << " " << i+1+(j+1)*num_x << " " << i+(j+1)*num_x << "\n";
-		vtk_file << "\nPOINT_DATA " << number_of_nodes << "\n";
+		vtk_file << "\nPOINT_DATA " << num_x * num_y << "\n";
 		vtk_file << "SCALARS E FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
 		for (int i = 0; i < num_x; i++)
@@ -419,6 +477,7 @@ public:
 		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
+				material_info & mi = mesh.get_material(i, j);
 				vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]) << "\n";
 			}
 		vtk_file << "SCALARS K FLOAT\n";
@@ -426,6 +485,7 @@ public:
 		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
+				material_info & mi = mesh.get_material(i, j);
 				vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[i + j*num_x]) << "\n";
 			}
 		vtk_file << "SCALARS state FLOAT\n";
@@ -433,6 +493,7 @@ public:
 		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
+				material_info & mi = mesh.get_material(i, j);
 				double T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
 				double state;
 				if (T <= mi.T1)
@@ -448,37 +509,56 @@ public:
 
 };
 
+
+
+
+
 int main()
 {
 	int num_x = 100;
 	int num_y = 100;
-	material_info mi = material_info(273.15, 273.15, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
+	double Lx = 5.0;
+	double Ly = 5.0;
+
+	std::vector<material_info> mis;
+	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
+	mis.push_back(material_info(268, 268, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
+
+	std::function<int(double, double)> mat_idx = []( double x, double y )
+	{ 
+		if (y < 2.5)
+			return 0;
+		else
+			return 1; 
+	};
+
+	mesh2d mesh = mesh2d(num_x, num_y, Ly, Lx, mis, mat_idx);
+
 	double * td = new double [num_x * num_y];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			//if ((n > 15 && n < 25 && i > 10 && i < 90) || (n > 45 && n < 55 && i > 10 && i < 90) || (n > 75 && n < 85 && i > 10 && i < 90)
-			//	|| (n > 10 && n < 90 && i > 15 && i < 25) || (n > 10 && n < 90 && i > 45 && i < 55) || (n > 10 && n < 90 && i > 75 && i < 85))
-			if ((n > 30 && n < 70 && i > 30 && i < n))
+			if ((n > 30 && n < 70 && i > 30 && i < 70))
 			{
-				td[n + i*num_x] = 273.0;
+				td[n + i*num_x] = 267.0;
 			}
 			else
 			{
-				td[n + i*num_x] = 293.5;
+				td[n + i*num_x] = 283.0;
 			}
 		}
-	solver2d sol = solver2d(num_x, num_y, 5.0, 5.0, mi, td);
+
+	solver2d sol = solver2d(mesh, td);
 	for (int i = 0; i < 100000; ++i)
 	{
-		if (i%10 == 0)
+		if (i%20 == 0)
 		{
 			std::cout << "step: " << i << std::endl;
 			std::stringstream ss;
 			ss << i;
 			sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
 		}
-		sol.step(1000);	
+		sol.step(2000);	
 	}
 	delete [] td;
 	return 0;
