@@ -26,6 +26,9 @@ struct material_info
 	double specific_heat_capacity_S;
 
 
+	material_info()
+	{
+	}
 	material_info(double T1, double T2, double rho_L, double rho_S, double thermal_conductivity_L, double thermal_conductivity_S,
 		double specific_heat_fusion, double specific_heat_capacity_L, double specific_heat_capacity_S)
 		: T1(T1), T2(T2), rho_L(rho_L), rho_S(rho_S), thermal_conductivity_L(thermal_conductivity_L), thermal_conductivity_S(thermal_conductivity_S),
@@ -35,12 +38,15 @@ struct material_info
 
 	double get_enthalpy_by_T(double T)
 	{
+		double E;
 		if (T < T1)
-			return get_b() * T;
+			E = get_b() * T;
 		else if (T < T2)
-			return (get_p1() * T - get_p2())/(T2-T1);
+			E = (T - get_p2()) / get_p1();
 		else
-			return get_r1() * T + get_r2();
+			E = get_r1() * T + get_r2();
+		//E += 
+		return E;
 	}
 
 	double get_T_by_enthalpy(double enthalpy)
@@ -50,7 +56,7 @@ struct material_info
 		if (enthalpy < E1)
 			return enthalpy / get_b();
 		else if (enthalpy < E2)
-			return (enthalpy * (T2-T1) + get_p2()) / get_p1();
+			return enthalpy * get_p1() + get_p2();
 		else 
 			return (enthalpy - get_r2()) / get_r1();
 	}
@@ -62,8 +68,7 @@ struct material_info
 		if (enthalpy < E1)
 			return thermal_conductivity_S;
 		else if (enthalpy < E2)
-			return ((thermal_conductivity_L - thermal_conductivity_S) * enthalpy + 
-				thermal_conductivity_S * E2 - thermal_conductivity_L * E1) / (E2 - E1);
+			return ((thermal_conductivity_L - thermal_conductivity_S) * enthalpy + thermal_conductivity_S * E2 - thermal_conductivity_L * E1) / (E2 - E1);
 		else
 			return thermal_conductivity_L;
 	}
@@ -75,7 +80,7 @@ struct material_info
 		if (enthalpy < E1)
 			return 1.0 / get_b();
 		else if (enthalpy < E2)
-			return (T2-T1) / get_p1();
+			return get_p1();
 		else
 			return 1.0 / get_r1();
 	}
@@ -88,7 +93,7 @@ struct material_info
 		if (enthalpy < E1)
 			return 0.0;
 		else if (enthalpy < E2)
-			return get_p2() / get_p1();
+			return get_p2();
 		else
 			return -get_r2() / get_r1();
 	}
@@ -101,12 +106,12 @@ private:
 
 	double get_p1()
 	{
-		return rho_S * specific_heat_capacity_S * (T2-T1) + rho_S * specific_heat_fusion;
+		return (T2-T1)/(rho_S*specific_heat_fusion);
 	}
 
 	double get_p2()
 	{
-		return rho_S * specific_heat_fusion * (T1+T2)/2.0;
+		return T1*(1.0 - specific_heat_capacity_S*(T2-T1)/specific_heat_fusion);
 	}
 
 	double get_r1()
@@ -116,7 +121,7 @@ private:
 
 	double get_r2()
 	{
-		return rho_S * specific_heat_fusion + (rho_S * specific_heat_capacity_S - rho_L * specific_heat_capacity_L) * T2;
+		return rho_S * specific_heat_fusion + rho_S * specific_heat_capacity_S * T1 - rho_L * specific_heat_capacity_L * T2;
 	}
 
 };
@@ -259,6 +264,12 @@ class solver2d
 		double * f = new double[num_1];
 		double * x = new double[num_1];
 
+		material_info mi;
+		material_info min1;
+		material_info mip1;
+		material_info min2;
+		material_info mip2;
+		
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
 			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
@@ -272,21 +283,40 @@ class solver2d
 				const double * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
 				const double * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
 
-				material_info & mi = mesh.get_material(ix, iy);
 
-				double kp = (mi.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
-				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
+				material_info mi = mesh.get_material(ix, iy);
+
+				if (axis==0)
+				{
+					min1 = mesh.get_material(ix-1, iy);
+					mip1 = mesh.get_material(ix+1, iy);
+
+					min2 = mesh.get_material(ix, iy-1);
+					mip2 = mesh.get_material(ix, iy+1);
+				}
+				else
+				{
+					min1 = mesh.get_material(ix, iy-1);
+					mip1 = mesh.get_material(ix, iy+1);
+
+					min2 = mesh.get_material(ix-1, iy);
+					mip2 = mesh.get_material(ix+1, iy);
+				}
+				
+
+				double kp = (mip1.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
+				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + min1.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
 
 				double coef = dt / (2.0 * h1 * h1);
-				a[i1] = -coef * mi.get_alpha(E_iter[idx1_m]) * km;
+				a[i1] = -coef * min1.get_alpha(E_iter[idx1_m]) * km;
 				b[i1] = 1.0 + coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
-				c[i1] = -coef * mi.get_alpha(E_iter[idx1_p]) * kp;
-				f[i1] = E_step[idx1_c] + coef * (mi.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mi.get_beta(E_iter[idx1_p])*kp);
+				c[i1] = -coef * mip1.get_alpha(E_iter[idx1_p]) * kp;
+				f[i1] = E_step[idx1_c] + coef * (min1.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mip1.get_beta(E_iter[idx1_p])*kp);
 
-				double k2p = (mi.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
-				double k2n = (mi.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
-				double T2p = mi.get_T_by_enthalpy(E_step[idx2_p]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
-				double T2n = mi.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				double k2p = (mip2.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				double k2n = (min2.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				double T2p = mip2.get_T_by_enthalpy(E_step[idx2_p]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				double T2n = min2.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
 				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
 
@@ -401,7 +431,7 @@ class solver2d
 	{
 		double L2_norm = 1.0;
 		assign(next_iteration_data, enthalpy_data);
-		while (L2_norm > 1e-5)
+		while (L2_norm > 1e-3)
 		{
 			assign(current_iteration_data, next_iteration_data);
 			iterate_tridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
@@ -414,7 +444,7 @@ class solver2d
 			std::cout << "next L2 = " << calculate_L2_norm(next_iteration_data) << std::endl;
 			std::cout << "next - curr L2 = " << calculate_L2_norm(current_iteration_data, next_iteration_data) << std::endl;
 			std::cout << " ------------------------ " << std::endl;
-			*/
+			/**/
 			
 		}
 		
@@ -519,15 +549,16 @@ int main()
 	double Ly = 5.0;
 
 	std::vector<material_info> mis;
+	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
 	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
-	mis.push_back(material_info(168, 168, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
+	mis.push_back(material_info(50000, 50000, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
 
 	std::function<int(double, double)> mat_idx = []( double x, double y )
 	{ 
 		if (y < 2.5)
 			return 0;
 		else
-			return 0; 
+			return 2; 
 	};
 
 	mesh2d mesh = mesh2d(num_x, num_y, Ly, Lx, mis, mat_idx);
@@ -536,23 +567,28 @@ int main()
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			if ((n > 33 && n < 50 && i > 33 && i < 50))
+			if ((n > 30 && n < 70 && i > 30 && i < 50))
 			{
-				td[n + i*num_x] = 10.0;
+				td[n + i*num_x] = 263.0;
+			}
+			else if (i >= 50)
+			{
+				td[n + i*num_x] = 363.0;
 			}
 			else
 			{
-				td[n + i*num_x] = 283.0;
+				td[n + i*num_x] = 373.0;
 			}
 		}
 
 	solver2d sol = solver2d(mesh, td);
-	for (int i = 0; i < 100; ++i)
+	for (int i = 0; i < 1000; ++i)
 	{
-		if (i%10 == 0)
+		if (i%20 == 0)
 		{
 			std::stringstream ss;
 			ss << i;
+			std::cout << "step: " << i << std::endl;
 			sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
 		}
 		sol.step(1000);	
