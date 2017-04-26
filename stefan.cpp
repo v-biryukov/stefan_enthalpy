@@ -35,7 +35,7 @@ struct material_info
 		if (T < T1)
 			return get_b() * T;
 		else if (T < T2)
-			return get_p1() * T - get_p2();
+			return (get_p1() * T - get_p2())/(T2-T1);
 		else
 			return get_r1() * T + get_r2();
 	}
@@ -47,7 +47,7 @@ struct material_info
 		if (enthalpy < E1)
 			return enthalpy / get_b();
 		else if (enthalpy < E2)
-			return (enthalpy + get_p2()) / get_p1();
+			return (enthalpy * (T2-T1) + get_p2()) / get_p1();
 		else 
 			return (enthalpy - get_r2()) / get_r1();
 	}
@@ -72,7 +72,7 @@ struct material_info
 		if (enthalpy < E1)
 			return 1.0 / get_b();
 		else if (enthalpy < E2)
-			return 1.0 / get_p1();
+			return (T2-T1) / get_p1();
 		else
 			return 1.0 / get_r1();
 	}
@@ -98,12 +98,12 @@ private:
 
 	double get_p1()
 	{
-		return rho_S * specific_heat_capacity_S + rho_S * specific_heat_fusion / (T2-T1);
+		return rho_S * specific_heat_capacity_S * (T2-T1) + rho_S * specific_heat_fusion;
 	}
 
 	double get_p2()
 	{
-		return rho_S * specific_heat_fusion * (T2 + T1) / 2.0 / (T2-T1);
+		return rho_S * specific_heat_fusion * (T1+T2)/2.0;
 	}
 
 	double get_r1()
@@ -177,20 +177,13 @@ class solver2d
 	}
 
 
-	void iterate_tridiagonal(int axis, const double * enthalpy_data, double * current_iteration_data, double * next_iteration_data, double dt)
+	void iterate_tridiagonal(int axis, const double * enthalpy_data, const double * current_iteration_data, double * next_iteration_data, double dt)
 	{
-		double * a = new double[num_x];
-		double * b = new double[num_x];
-		double * c = new double[num_x];
-		double * f = new double[num_x];
-		double * x = new double[num_x];
-
 		int idx1_p, idx1_c, idx1_m;
 		int idx2_p, idx2_c, idx2_m;
 		int num_1, num_2;
 		double h1, h2;
 
-		double * E = current_iteration_data;
 		if (axis == 0)
 		{
 			idx1_p = 1;
@@ -214,6 +207,12 @@ class solver2d
 			h1 = hy; h2 = hx;
 		}
 
+		double * a = new double[num_1];
+		double * b = new double[num_1];
+		double * c = new double[num_1];
+		double * f = new double[num_1];
+		double * x = new double[num_1];
+
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
 			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
@@ -224,18 +223,18 @@ class solver2d
 			{
 				int ix = axis ? i2 : i1;
 				int iy = axis ? i1 : i2;
-				double * E_iter = current_iteration_data + ix + iy*num_x;
+				const double * E_iter = current_iteration_data + ix + iy*num_x;
 				const double * E_step = enthalpy_data + ix + iy*num_x;
 
 				double kp = (mi.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
 				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
 
 
-				double coef = -dt / (2.0 * h1 * h1);
-				a[i1] = coef * mi.get_alpha(E_iter[idx1_m]) * km;
-				b[i1] = 1.0 - coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
-				c[i1] = coef * mi.get_alpha(E_iter[idx1_p]) * kp;
-				f[i1] = E_step[idx1_c] - coef * (mi.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mi.get_beta(E_iter[idx1_p])*kp);
+				double coef = dt / (2.0 * h1 * h1);
+				a[i1] = -coef * mi.get_alpha(E_iter[idx1_m]) * km;
+				b[i1] = 1.0 + coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
+				c[i1] = -coef * mi.get_alpha(E_iter[idx1_p]) * kp;
+				f[i1] = E_step[idx1_c] + coef * (mi.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mi.get_beta(E_iter[idx1_p])*kp);
 
 
 				double k2p = (mi.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
@@ -287,7 +286,7 @@ class solver2d
 			{
 				L2 += (A[n + i*num_x] - B[n + i*num_x]) * (A[n + i*num_x] - B[n + i*num_x]);
 			}
-		L2 = sqrt(L2 / number_of_nodes);
+		L2 = sqrt(L2);
 		return L2;
 	}
 
@@ -299,8 +298,34 @@ class solver2d
 			{
 				L2 += A[n + i*num_x] * A[n + i*num_x];
 			}
-		L2 = sqrt(L2 / number_of_nodes);
+		L2 = sqrt(L2);
 		return L2;
+	}
+
+	double calculate_Linf_norm(const double * A, const double * B)
+	{
+		double Linf = 0.0;
+		for (int n = 0; n < num_x; ++n)
+			for (int i = 0; i < num_y; ++i)
+			{
+				double current_norm = fabs(A[n + i*num_x] - B[n + i*num_x]);
+				if (current_norm > Linf)
+					Linf = current_norm;
+			}
+		return Linf;
+	}
+
+	double calculate_Linf_norm(const double * A)
+	{
+		double Linf = 0.0;
+		for (int n = 0; n < num_x; ++n)
+			for (int i = 0; i < num_y; ++i)
+			{
+				double current_norm = fabs(A[n + i*num_x]);
+				if (current_norm > Linf)
+					Linf = current_norm;
+			}
+		return Linf;
 	}
 
 	double assign(double * A, const double * B)
@@ -319,14 +344,27 @@ class solver2d
 		double L2_norm = 1.0;
 
 		assign(next_iteration_data, enthalpy_data);
-		while (L2_norm > 5e-3)
+		while (L2_norm > 1e-5)
 		{
 			assign(current_iteration_data, next_iteration_data);
 			iterate_tridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
-			L2_norm = calculate_L2_norm(current_iteration_data, next_iteration_data) / calculate_L2_norm(current_iteration_data);
-			//std::cout << "L2 = " << L2_norm << std::endl;
+			L2_norm = calculate_Linf_norm(current_iteration_data, next_iteration_data) / calculate_Linf_norm(current_iteration_data);
+			
+			/*
+			std::cout.precision(17);
+			std::cout << "diff L2 = " << L2_norm << std::endl;
+			std::cout << "curr L2 = " << calculate_L2_norm(current_iteration_data) << std::endl;
+			std::cout << "next L2 = " << calculate_L2_norm(next_iteration_data) << std::endl;
+			std::cout << "next - curr L2 = " << calculate_L2_norm(current_iteration_data, next_iteration_data) << std::endl;
+			std::cout << " ------------------------ " << std::endl;
+			*/
+			
+			
+			
 		}
+		
 		assign(enthalpy_data, next_iteration_data);
+		
 	}
 
 
@@ -359,52 +397,52 @@ public:
 
 	void save_to_vtk(std::string name)
 	{
-	    std::ofstream vtk_file(name.c_str());
-	    vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
-	    vtk_file << "DATASET POLYDATA\nPOINTS " << number_of_nodes << " float\n";
-	    for ( int i = 0; i < number_of_nodes; i++ )
-	        vtk_file << (i/num_x) * hx << " " << (i%num_x) * hy << " "  << 0.0 << "\n";
-	    vtk_file << "\nPOLYGONS " << (num_x-1)*(num_y-1) << " " << (num_x-1)*(num_y-1)*5 << "\n";
-	    for (int i = 0; i < num_x-1; i++)
+		std::ofstream vtk_file(name.c_str());
+		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
+		vtk_file << "DATASET POLYDATA\nPOINTS " << number_of_nodes << " float\n";
+		for ( int i = 0; i < number_of_nodes; i++ )
+			vtk_file << (i/num_x) * hx << " " << (i%num_x) * hy << " "  << 0.0 << "\n";
+		vtk_file << "\nPOLYGONS " << (num_x-1)*(num_y-1) << " " << (num_x-1)*(num_y-1)*5 << "\n";
+		for (int i = 0; i < num_x-1; i++)
 			for (int j = 0; j < num_y-1; j++)
-	        	vtk_file << 4 << " " << i+j*num_x << " " << i+1+j*num_x << " " << i+1+(j+1)*num_x << " " << i+(j+1)*num_x << "\n";
-	    vtk_file << "\nPOINT_DATA " << number_of_nodes << "\n";
-	    vtk_file << "SCALARS E FLOAT\n";
-	    vtk_file << "LOOKUP_TABLE default\n";
-	    for (int i = 0; i < num_x; i++)
+				vtk_file << 4 << " " << i+j*num_x << " " << i+1+j*num_x << " " << i+1+(j+1)*num_x << " " << i+(j+1)*num_x << "\n";
+		vtk_file << "\nPOINT_DATA " << number_of_nodes << "\n";
+		vtk_file << "SCALARS E FLOAT\n";
+		vtk_file << "LOOKUP_TABLE default\n";
+		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
-	        	vtk_file <<  enthalpy_data[i + j*num_x] << "\n";
-	    	}
-	    vtk_file << "SCALARS T FLOAT\n";
-	    vtk_file << "LOOKUP_TABLE default\n";
-	    for (int i = 0; i < num_x; i++)
+				vtk_file <<  enthalpy_data[i + j*num_x] << "\n";
+			}
+		vtk_file << "SCALARS T FLOAT\n";
+		vtk_file << "LOOKUP_TABLE default\n";
+		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
-	        	vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]) << "\n";
-	    	}
-	   	vtk_file << "SCALARS K FLOAT\n";
-	    vtk_file << "LOOKUP_TABLE default\n";
-	    for (int i = 0; i < num_x; i++)
+				vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]) << "\n";
+			}
+		vtk_file << "SCALARS K FLOAT\n";
+		vtk_file << "LOOKUP_TABLE default\n";
+		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
-	        	vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[i + j*num_x]) << "\n";
-	    	}
-	    vtk_file << "SCALARS state FLOAT\n";
-	    vtk_file << "LOOKUP_TABLE default\n";
-	    for (int i = 0; i < num_x; i++)
+				vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[i + j*num_x]) << "\n";
+			}
+		vtk_file << "SCALARS state FLOAT\n";
+		vtk_file << "LOOKUP_TABLE default\n";
+		for (int i = 0; i < num_x; i++)
 			for (int j = 0; j < num_y; j++)
 			{
 				double T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
 				double state;
-				if (T < mi.T1)
+				if (T <= mi.T1)
 					state = 0.0;
-				else if (T < mi.T2)
+				else if (T <= mi.T2)
 					state = (T-mi.T1)/(mi.T2-mi.T1);
 				else
 					state = 1.0;
-	        	vtk_file <<  state << "\n";
-	    	}
+				vtk_file <<  state << "\n";
+			}
 	}
 
 
@@ -414,20 +452,20 @@ int main()
 {
 	int num_x = 100;
 	int num_y = 100;
-	material_info mi = material_info(273.0, 274.0, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
+	material_info mi = material_info(273.15, 273.15, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0);
 	double * td = new double [num_x * num_y];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
 			//if ((n > 15 && n < 25 && i > 10 && i < 90) || (n > 45 && n < 55 && i > 10 && i < 90) || (n > 75 && n < 85 && i > 10 && i < 90)
 			//	|| (n > 10 && n < 90 && i > 15 && i < 25) || (n > 10 && n < 90 && i > 45 && i < 55) || (n > 10 && n < 90 && i > 75 && i < 85))
-			if ((n > 30 && n < 70 && i > 30 && i < 70))
+			if ((n > 30 && n < 70 && i > 30 && i < n))
 			{
-				td[n + i*num_x] = 70.0;
+				td[n + i*num_x] = 273.0;
 			}
 			else
 			{
-				td[n + i*num_x] = 300.0;
+				td[n + i*num_x] = 293.5;
 			}
 		}
 	solver2d sol = solver2d(num_x, num_y, 5.0, 5.0, mi, td);
@@ -437,9 +475,9 @@ int main()
 		{
 			std::cout << "step: " << i << std::endl;
 			std::stringstream ss;
-	        ss << i;
-	        sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
-    	}
+			ss << i;
+			sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
+		}
 		sol.step(1000);	
 	}
 	delete [] td;
