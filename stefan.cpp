@@ -178,8 +178,8 @@ class solver2d
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
-		for (int n = 0; n < num_x; ++n)
-			for (int i = 0; i < num_y; ++i)
+		for (int i = 0; i < num_y; ++i)
+			for (int n = 0; n < num_x; ++n)
 				enthalpy_data[n + i * num_x] = mesh.get_material(n, i).get_enthalpy_by_T(temperature_data[n + i * num_x]);
 	}
 
@@ -277,13 +277,11 @@ class solver2d
 				double kp = (mi.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
 				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
 
-
 				double coef = dt / (2.0 * h1 * h1);
 				a[i1] = -coef * mi.get_alpha(E_iter[idx1_m]) * km;
 				b[i1] = 1.0 + coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
 				c[i1] = -coef * mi.get_alpha(E_iter[idx1_p]) * kp;
 				f[i1] = E_step[idx1_c] + coef * (mi.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mi.get_beta(E_iter[idx1_p])*kp);
-
 
 				double k2p = (mi.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
 				double k2n = (mi.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
@@ -291,6 +289,7 @@ class solver2d
 				double T2n = mi.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
 				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
+
 
 			solve_triadiagonal(num_1, a, b, c, f, x);
 
@@ -301,12 +300,13 @@ class solver2d
 				for (int k = 0; k < num_1; ++k)
 					next_iteration_data[i2 + k*mesh.get_num_x()] = x[k];
 		}
-
 		delete [] a;
 		delete [] b;
 		delete [] c;
 		delete [] f;
 		delete [] x;
+
+
 	}
 
 	void solve_triadiagonal (int n, double *a, double *b, double *c, double *f, double *x)
@@ -400,7 +400,6 @@ class solver2d
 	void step(int axis, double dt)
 	{
 		double L2_norm = 1.0;
-
 		assign(next_iteration_data, enthalpy_data);
 		while (L2_norm > 1e-5)
 		{
@@ -416,8 +415,6 @@ class solver2d
 			std::cout << "next - curr L2 = " << calculate_L2_norm(current_iteration_data, next_iteration_data) << std::endl;
 			std::cout << " ------------------------ " << std::endl;
 			*/
-			
-			
 			
 		}
 		
@@ -435,6 +432,8 @@ public:
 		current_iteration_data = new double [mesh.get_number_of_nodes()];
 		next_iteration_data = new double [mesh.get_number_of_nodes()];
 		set_enthalpy_by_T_data(temperature_data);
+
+
 	}
 
 	~solver2d()
@@ -442,6 +441,8 @@ public:
 		delete [] enthalpy_data;
 		delete [] current_iteration_data;
 		delete [] next_iteration_data;
+
+
 	}
 
 	void step(double dt)
@@ -457,41 +458,38 @@ public:
 
 		std::ofstream vtk_file(name.c_str());
 		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
-		vtk_file << "DATASET POLYDATA\nPOINTS " << num_x * num_y << " float\n";
-		for ( int i = 0; i < num_x * num_y; i++ )
-			vtk_file << (i/num_x) * mesh.get_hx() << " " << (i%num_x) * mesh.get_hy() << " "  << 0.0 << "\n";
-		vtk_file << "\nPOLYGONS " << (num_x-1)*(num_y-1) << " " << (num_x-1)*(num_y-1)*5 << "\n";
-		for (int i = 0; i < num_x-1; i++)
-			for (int j = 0; j < num_y-1; j++)
-				vtk_file << 4 << " " << i+j*num_x << " " << i+1+j*num_x << " " << i+1+(j+1)*num_x << " " << i+(j+1)*num_x << "\n";
+		vtk_file << "DATASET STRUCTURED_POINTS\nDIMENSIONS " << num_x << " " << num_y << " 1" << "\n";
+		vtk_file << "ORIGIN 0 0 0\n" << "SPACING " << mesh.get_hx() << " " << mesh.get_hy() << " 1" << "\n";
+
 		vtk_file << "\nPOINT_DATA " << num_x * num_y << "\n";
 		vtk_file << "SCALARS E FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int i = 0; i < num_x; i++)
-			for (int j = 0; j < num_y; j++)
+		
+		for (int j = 0; j < num_y; j++)
+			for (int i = 0; i < num_x; i++)
 			{
 				vtk_file <<  enthalpy_data[i + j*num_x] << "\n";
 			}
 		vtk_file << "SCALARS T FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int i = 0; i < num_x; i++)
-			for (int j = 0; j < num_y; j++)
+		for (int j = 0; j < num_y; j++)
+			for (int i = 0; i < num_x; i++)
 			{
 				material_info & mi = mesh.get_material(i, j);
 				vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]) << "\n";
 			}
 		vtk_file << "SCALARS K FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int i = 0; i < num_x; i++)
-			for (int j = 0; j < num_y; j++)
+		for (int j = 0; j < num_y; j++)
+			for (int i = 0; i < num_x; i++)
 			{
 				material_info & mi = mesh.get_material(i, j);
 				vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[i + j*num_x]) << "\n";
 			}
 		vtk_file << "SCALARS state FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int i = 0; i < num_x; i++)
-			for (int j = 0; j < num_y; j++)
+		for (int j = 0; j < num_y; j++)
+			for (int i = 0; i < num_x; i++)
 			{
 				material_info & mi = mesh.get_material(i, j);
 				double T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
@@ -515,21 +513,21 @@ public:
 
 int main()
 {
-	int num_x = 100;
-	int num_y = 100;
+	int num_x = 101;
+	int num_y = 101;
 	double Lx = 5.0;
 	double Ly = 5.0;
 
 	std::vector<material_info> mis;
 	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
-	mis.push_back(material_info(268, 268, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
+	mis.push_back(material_info(168, 168, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
 
 	std::function<int(double, double)> mat_idx = []( double x, double y )
 	{ 
 		if (y < 2.5)
 			return 0;
 		else
-			return 1; 
+			return 0; 
 	};
 
 	mesh2d mesh = mesh2d(num_x, num_y, Ly, Lx, mis, mat_idx);
@@ -538,9 +536,9 @@ int main()
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			if ((n > 30 && n < 70 && i > 30 && i < 70))
+			if ((n > 33 && n < 50 && i > 33 && i < 50))
 			{
-				td[n + i*num_x] = 267.0;
+				td[n + i*num_x] = 10.0;
 			}
 			else
 			{
@@ -549,16 +547,15 @@ int main()
 		}
 
 	solver2d sol = solver2d(mesh, td);
-	for (int i = 0; i < 100000; ++i)
+	for (int i = 0; i < 100; ++i)
 	{
-		if (i%20 == 0)
+		if (i%10 == 0)
 		{
-			std::cout << "step: " << i << std::endl;
 			std::stringstream ss;
 			ss << i;
 			sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
 		}
-		sol.step(2000);	
+		sol.step(1000);	
 	}
 	delete [] td;
 	return 0;
