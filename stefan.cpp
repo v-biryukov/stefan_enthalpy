@@ -5,7 +5,7 @@
 #include <math.h>
 #include <vector>
 #include <functional>
-
+#include <algorithm>
 
 
 
@@ -177,7 +177,8 @@ class solver2d
 	double * current_iteration_data;
 	double * next_iteration_data;
 
-
+	// Auxiliary arrays for tridiagonal method
+	double *a, *b, *c, *f, *x;
 
 	void set_enthalpy_by_T_data(const double * temperature_data)
 	{
@@ -188,51 +189,12 @@ class solver2d
 				enthalpy_data[n + i * num_x] = mesh.get_material(n, i).get_enthalpy_by_T(temperature_data[n + i * num_x]);
 	}
 
-
-	void iterate_jacobi(int axis, const double * enthalpy_data, double * current_iteration_data, double * next_iteration_data, double dt)
-	{
-		const double * Ex;
-		const double * Ey;
-		if (axis == 0)
-		{
-			Ex = current_iteration_data;
-			Ey = enthalpy_data;
-		}
-		else if (axis == 1)
-		{
-			Ex = enthalpy_data;
-			Ey = current_iteration_data;
-		}
-
-		int num_x = mesh.get_num_x();
-		int num_y = mesh.get_num_y();
-		double hx = mesh.get_hx();
-		double hy = mesh.get_hy();
-
-		for (int n = 1; n < num_x-1; ++n)
-			for (int i = 1; i < num_y-1; ++i)
-			{
-				material_info & mi = mesh.get_material(n, i);
-				double k1 = (mi.get_thermal_conductivity_by_E(Ex[n+1 + i*num_x]) + mi.get_thermal_conductivity_by_E(Ex[n + i*num_x])) / 2.0;
-				double k2 = (mi.get_thermal_conductivity_by_E(Ex[n + i*num_x]) + mi.get_thermal_conductivity_by_E(Ex[n-1 + i*num_x])) / 2.0;
-				double Tn1 = (mi.get_T_by_enthalpy(Ex[n+1 + i*num_x]) - mi.get_T_by_enthalpy(Ex[n + i*num_x])) / hx;
-				double Tn2 = (mi.get_T_by_enthalpy(Ex[n-1 + i*num_x]) - mi.get_T_by_enthalpy(Ex[n + i*num_x])) / hx;
-				double Lamda1 = (k1 * Tn1 * hy + k2 * Tn2 * hy);
-				k1 = (mi.get_thermal_conductivity_by_E(Ey[n + (i+1)*num_x]) + mi.get_thermal_conductivity_by_E(Ey[n + i*num_x])) / 2.0;
-				k2 = (mi.get_thermal_conductivity_by_E(Ey[n + i*num_x]) + mi.get_thermal_conductivity_by_E(Ey[n + (i-1)*num_x])) / 2.0;
-				Tn1 = (mi.get_T_by_enthalpy(Ey[n + (i+1)*num_x]) - mi.get_T_by_enthalpy(Ey[n + i*num_x])) / hx;
-				Tn2 = (mi.get_T_by_enthalpy(Ey[n + (i-1)*num_x]) - mi.get_T_by_enthalpy(Ey[n + i*num_x])) / hx;
-				double Lamda2 = (k1 * Tn1 * hy + k2 * Tn2 * hy);
-				next_iteration_data[n + i*num_x] = current_iteration_data[n + i*num_x] + (Lamda1 + Lamda2) * dt / (2.0 * hx * hy);
-			}
-	}
-
-
 	void iterate_tridiagonal(int axis, const double * enthalpy_data, const double * current_iteration_data, double * next_iteration_data, double dt)
 	{
 		int idx1_p, idx1_c, idx1_m;
 		int idx2_p, idx2_c, idx2_m;
 		int num_1, num_2;
+		int ix, iy;
 		double h1, h2;
 
 		if (axis == 0)
@@ -258,51 +220,36 @@ class solver2d
 			h1 =  mesh.get_hy(); h2 = mesh.get_hx();
 		}
 
-		double * a = new double[num_1];
-		double * b = new double[num_1];
-		double * c = new double[num_1];
-		double * f = new double[num_1];
-		double * x = new double[num_1];
-
-		material_info mi;
-		material_info min1;
-		material_info mip1;
-		material_info min2;
-		material_info mip2;
+		material_info mi, min1, mip1, min2, mip2;
 		
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
 			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 			a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
-			
 
 			for (int i1 = 1; i1 < num_1-1; ++i1)
 			{
-				int ix = axis ? i2 : i1;
-				int iy = axis ? i1 : i2;
-				const double * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
-				const double * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
-
-
-				material_info mi = mesh.get_material(ix, iy);
-
-				if (axis==0)
+				if (axis == 0)
 				{
+					ix = i1; iy = i2;
+					mi = mesh.get_material(ix, iy);
 					min1 = mesh.get_material(ix-1, iy);
 					mip1 = mesh.get_material(ix+1, iy);
-
 					min2 = mesh.get_material(ix, iy-1);
 					mip2 = mesh.get_material(ix, iy+1);
 				}
 				else
 				{
+					ix = i2; iy = i1;
+					mi = mesh.get_material(ix, iy);
 					min1 = mesh.get_material(ix, iy-1);
 					mip1 = mesh.get_material(ix, iy+1);
-
 					min2 = mesh.get_material(ix-1, iy);
 					mip2 = mesh.get_material(ix+1, iy);
 				}
 				
+				const double * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
+				const double * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
 
 				double kp = (mip1.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
 				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + min1.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
@@ -320,26 +267,14 @@ class solver2d
 				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
 
-
-			solve_triadiagonal(num_1, a, b, c, f, x);
-
-			if (axis == 0)
-				for (int k = 0; k < num_1; ++k)
-					next_iteration_data[k + i2*mesh.get_num_x()] = x[k];
-			else if (axis == 1)
-				for (int k = 0; k < num_1; ++k)
-					next_iteration_data[i2 + k*mesh.get_num_x()] = x[k];
+			solve_tridiagonal(num_1, a, b, c, f, x);
+			for (int k = 0; k < num_1; ++k)
+					next_iteration_data[idx1_p * k + idx2_p * i2] = x[k];
 		}
-		delete [] a;
-		delete [] b;
-		delete [] c;
-		delete [] f;
-		delete [] x;
-
-
 	}
 
-	void solve_triadiagonal (int n, double *a, double *b, double *c, double *f, double *x)
+
+	void solve_tridiagonal (int n, double *a, double *b, double *c, double *f, double *x)
 	{
 		double m;
 		for (int i = 1; i < n; i++)
@@ -436,20 +371,8 @@ class solver2d
 			assign(current_iteration_data, next_iteration_data);
 			iterate_tridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
 			L2_norm = calculate_Linf_norm(current_iteration_data, next_iteration_data) / calculate_Linf_norm(current_iteration_data);
-			
-			/*
-			std::cout.precision(17);
-			std::cout << "diff L2 = " << L2_norm << std::endl;
-			std::cout << "curr L2 = " << calculate_L2_norm(current_iteration_data) << std::endl;
-			std::cout << "next L2 = " << calculate_L2_norm(next_iteration_data) << std::endl;
-			std::cout << "next - curr L2 = " << calculate_L2_norm(current_iteration_data, next_iteration_data) << std::endl;
-			std::cout << " ------------------------ " << std::endl;
-			/**/
-			
 		}
-		
 		assign(enthalpy_data, next_iteration_data);
-		
 	}
 
 
@@ -463,7 +386,12 @@ public:
 		next_iteration_data = new double [mesh.get_number_of_nodes()];
 		set_enthalpy_by_T_data(temperature_data);
 
-
+		int max_n = std::max(mesh.get_num_x(), mesh.get_num_y());
+		a = new double[max_n];
+		b = new double[max_n];
+		c = new double[max_n];
+		f = new double[max_n];
+		x = new double[max_n];
 	}
 
 	~solver2d()
@@ -472,7 +400,11 @@ public:
 		delete [] current_iteration_data;
 		delete [] next_iteration_data;
 
-
+		delete [] a;
+		delete [] b;
+		delete [] c;
+		delete [] f;
+		delete [] x;
 	}
 
 	void step(double dt)
@@ -533,65 +465,71 @@ public:
 				vtk_file <<  state << "\n";
 			}
 	}
-
-
 };
-
-
-
 
 
 int main()
 {
-	int num_x = 101;
-	int num_y = 101;
-	double Lx = 5.0;
-	double Ly = 5.0;
+	int num_x = 241;
+	int num_y = 121;
+	double Lx = 12.0;
+	double Ly = 6.0;
 
 	std::vector<material_info> mis;
-	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
+	mis.push_back(material_info(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
+	mis.push_back(material_info(270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
 	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
-	mis.push_back(material_info(50000, 50000, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
+	mis.push_back(material_info(50, 50, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
+	mis.push_back(material_info(5000, 5000, 2837.0, 2837.0, 1.4, 1.4, 1e9, 1480, 1480));
+	
 
 	std::function<int(double, double)> mat_idx = []( double x, double y )
 	{ 
-		if (y < 2.5)
+		if (y <= 1)
+			return 4;
+		else if (y < 2)
+			return 2;
+		else if (y < 3)
+			return 1;
+		else if (y < 4 || ((y<4.5) && (x>4) && (x<8)))
 			return 0;
 		else
-			return 2; 
+			return 3;
 	};
 
-	mesh2d mesh = mesh2d(num_x, num_y, Ly, Lx, mis, mat_idx);
+	mesh2d mesh = mesh2d(num_x, num_y, Lx, Ly, mis, mat_idx);
 
 	double * td = new double [num_x * num_y];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 		{
-			if ((n > 30 && n < 70 && i > 30 && i < 50))
+			double x = n*Lx/(num_x-1);
+			double y = i*Ly/(num_y-1);
+			if ((x > 4 && x < 8 && y > 1 && y < 4.5))
 			{
 				td[n + i*num_x] = 263.0;
 			}
-			else if (i >= 50)
+			else if (y <= 1)
 			{
-				td[n + i*num_x] = 363.0;
+				td[n + i*num_x] = 273.0;
 			}
 			else
 			{
-				td[n + i*num_x] = 373.0;
+				td[n + i*num_x] = 303.0;
 			}
 		}
 
 	solver2d sol = solver2d(mesh, td);
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 50000; ++i)
 	{
-		if (i%20 == 0)
+		if (i%10 == 0)
 		{
 			std::stringstream ss;
 			ss << i;
 			std::cout << "step: " << i << std::endl;
 			sol.save_to_vtk("out/result_" + ss.str() + ".vtk");
 		}
-		sol.step(1000);	
+		sol.step(300);	
 	}
 	delete [] td;
 	return 0;
