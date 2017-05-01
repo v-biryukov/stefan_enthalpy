@@ -37,11 +37,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BINDIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BINDIR})
 
 IF (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    SET(BinaryFileName ${PROJECT_NAME}_d)
+    SET(BinaryFileName ${PROJECT_NAME}Debug)
 ENDIF()
 
 IF (${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    SET(BinaryFileName stefan)
+    SET(BinaryFileName ${PROJECT_NAME})
 ENDIF()
 
 set(math
