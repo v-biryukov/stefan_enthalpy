@@ -245,7 +245,7 @@ class solver3d
 		return Linf;
 	}
 
-	double assign(double * A, const double * B)
+	void assign(double * A, const double * B)
 	{
 		for (int n = 0; n < mesh.get_num_x(); ++n)
 			for (int i = 0; i < mesh.get_num_y(); ++i)
