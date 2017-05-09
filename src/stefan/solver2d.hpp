@@ -6,60 +6,71 @@
 #include <iostream>
 #include <fstream>
 
+template <typename Scalar>
 class mesh2d
 {
 	int num_x;
 	int num_y;
 	int number_of_nodes;
-	double Lx;
-	double Ly;
-	double hx;
-	double hy;
+	Scalar Lx;
+	Scalar Ly;
+	Scalar hx;
+	Scalar hy;
 
-
-	std::vector<material_info> material_infos;
-	std::function<int(double, double)> material_index;
+	std::vector<material_info<Scalar>> material_infos;
+	std::function<int(Scalar, Scalar)> material_index;
 
 public:
 
 	mesh2d()
 	{
 	}
-	mesh2d(int num_x, int num_y, double Lx, double Ly, std::vector<material_info> material_infos, std::function<int(double, double)> material_index) 
-		: num_x(num_x), num_y(num_y), Lx(Lx), Ly(Ly), material_infos(material_infos), material_index(material_index)
+	mesh2d(int num_x, int num_y, 
+		Scalar Lx, Scalar Ly, 
+		std::vector<material_info<Scalar>> material_infos, 
+		std::function<int(Scalar, Scalar)> material_index) : 
+		num_x(num_x), num_y(num_y), 
+		Lx(Lx), Ly(Ly), 
+		material_infos(material_infos), 
+		material_index(material_index)
 	{
 		hx = Lx / (num_x-1);
 		hy = Ly / (num_y-1);
 		number_of_nodes = num_x * num_y;
 	}
 
-	material_info & get_material(int n, int i)
+	material_info& get_material(int n, int i)
 	{
-		return material_infos[material_index(n*hx, i*hy)];
+		return const_cast<material_info&>(const_cast<const material_info*>(this)->get_material(n, i));
 	}
 
-	inline double get_Lx() {return Lx;}
-	inline double get_Ly() {return Ly;}
-	inline double get_hx() {return hx;}
-	inline double get_hy() {return hy;}
-	inline int get_num_x() {return num_x;}
-	inline int get_num_y() {return num_y;}
-	inline int get_number_of_nodes() {return number_of_nodes;}
+	const material_info& get_material(int n, int i) const
+	{
+		return material_infos[material_index(n * hx, i * hy)];
+	}
+
+	inline Scalar get_Lx() const {return Lx;}
+	inline Scalar get_Ly() const {return Ly;}
+	inline Scalar get_hx() const {return hx;}
+	inline Scalar get_hy() const {return hy;}
+	inline int get_num_x() const {return num_x;}
+	inline int get_num_y() const {return num_y;}
+	inline int get_number_of_nodes() const {return number_of_nodes;}
 };
 
-
+template <typename Scalar>
 class solver2d
 {
-	mesh2d mesh;
+	mesh2d<Scalar> mesh;
 
-	double * enthalpy_data;
-	double * current_iteration_data;
-	double * next_iteration_data;
+	Scalar* enthalpy_data;
+	Scalar* current_iteration_data;
+	Scalar* next_iteration_data;
 
 	// Auxiliary arrays for tridiagonal method
-	double *a, *b, *c, *f, *x;
+	Scalar *a, *b, *c, *f, *x;
 
-	void set_enthalpy_by_T_data(const double * temperature_data)
+	void set_enthalpy_by_T_data(const Scalar * temperature_data)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
@@ -68,13 +79,17 @@ class solver2d
 				enthalpy_data[n + i * num_x] = mesh.get_material(n, i).get_enthalpy_by_T(temperature_data[n + i * num_x]);
 	}
 
-	void iterate_tridiagonal(int axis, const double * enthalpy_data, const double * current_iteration_data, double * next_iteration_data, double dt)
+	void iterate_tridiagonal(int axis, 
+		const Scalar * enthalpy_data, 
+		const Scalar * current_iteration_data, 
+		Scalar * next_iteration_data, 
+		Scalar dt)
 	{
 		int idx1_p, idx1_c, idx1_m;
 		int idx2_p, idx2_c, idx2_m;
 		int num_1, num_2;
 		int ix, iy;
-		double h1, h2;
+		Scalar h1, h2;
 
 		if (axis == 0)
 		{
@@ -99,7 +114,7 @@ class solver2d
 			h1 =  mesh.get_hy(); h2 = mesh.get_hx();
 		}
 
-		material_info mi, min1, mip1, min2, mip2;
+		material_info<Scalar> mi, min1, mip1, min2, mip2;
 		
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
@@ -127,22 +142,22 @@ class solver2d
 					mip2 = mesh.get_material(ix+1, iy);
 				}
 				
-				const double * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
-				const double * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
+				const Scalar * E_iter = current_iteration_data + ix + iy*mesh.get_num_x();
+				const Scalar * E_step = enthalpy_data + ix + iy*mesh.get_num_x();
 
-				double kp = (mip1.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
-				double km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + min1.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
+				Scalar kp = (mip1.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx1_c])) / 2.0;
+				Scalar km = (mi.get_thermal_conductivity_by_E(E_iter[idx1_c]) + min1.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
 
-				double coef = dt / (2.0 * h1 * h1);
+				Scalar coef = dt / (2.0 * h1 * h1);
 				a[i1] = -coef * min1.get_alpha(E_iter[idx1_m]) * km;
 				b[i1] = 1.0 + coef * mi.get_alpha(E_iter[idx1_c]) * (km + kp);
 				c[i1] = -coef * mip1.get_alpha(E_iter[idx1_p]) * kp;
 				f[i1] = E_step[idx1_c] + coef * (min1.get_beta(E_iter[idx1_m])*km - mi.get_beta(E_iter[idx1_c])*(km+kp) + mip1.get_beta(E_iter[idx1_p])*kp);
 
-				double k2p = (mip2.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
-				double k2n = (min2.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
-				double T2p = mip2.get_T_by_enthalpy(E_step[idx2_p]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
-				double T2n = min2.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				Scalar k2p = (mip2.get_thermal_conductivity_by_E(E_step[idx2_p]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				Scalar k2n = (min2.get_thermal_conductivity_by_E(E_step[idx2_m]) + mi.get_thermal_conductivity_by_E(E_step[idx2_c])) / 2.0;
+				Scalar T2p = mip2.get_T_by_enthalpy(E_step[idx2_p]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
+				Scalar T2n = min2.get_T_by_enthalpy(E_step[idx2_m]) - mi.get_T_by_enthalpy(E_step[idx2_c]);
 				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
 
@@ -152,9 +167,9 @@ class solver2d
 		}
 	}
 
-	void solve_tridiagonal (int n, double *a, double *b, double *c, double *f, double *x)
+	void solve_tridiagonal (int n, Scalar *a, Scalar *b, Scalar *c, Scalar *f, Scalar *x)
 	{
-		double m;
+		Scalar m;
 		for (int i = 1; i < n; i++)
 		{
 			m = a[i]/b[i-1];
@@ -168,11 +183,11 @@ class solver2d
 			x[i]=(f[i]-c[i]*x[i+1])/b[i];
 	}
 
-	double calculate_L2_norm(const double * A, const double * B)
+	Scalar calculate_L2_norm(const Scalar * A, const Scalar * B)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
-		double L2 = 0.0;
+		Scalar L2 = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
 			{
@@ -182,11 +197,11 @@ class solver2d
 		return L2;
 	}
 
-	double calculate_L2_norm(const double * A)
+	Scalar calculate_L2_norm(const Scalar * A)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
-		double L2 = 0.0;
+		Scalar L2 = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
 			{
@@ -196,37 +211,37 @@ class solver2d
 		return L2;
 	}
 
-	double calculate_Linf_norm(const double * A, const double * B)
+	Scalar calculate_Linf_norm(const Scalar * A, const Scalar * B)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
-		double Linf = 0.0;
+		Scalar Linf = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
 			{
-				double current_norm = fabs(A[n + i*num_x] - B[n + i*num_x]);
+				Scalar current_norm = fabs(A[n + i*num_x] - B[n + i*num_x]);
 				if (current_norm > Linf)
 					Linf = current_norm;
 			}
 		return Linf;
 	}
 
-	double calculate_Linf_norm(const double * A)
+	Scalar calculate_Linf_norm(const Scalar * A)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
-		double Linf = 0.0;
+		Scalar Linf = 0.0;
 		for (int n = 0; n < num_x; ++n)
 			for (int i = 0; i < num_y; ++i)
 			{
-				double current_norm = fabs(A[n + i*num_x]);
+				Scalar current_norm = fabs(A[n + i*num_x]);
 				if (current_norm > Linf)
 					Linf = current_norm;
 			}
 		return Linf;
 	}
 
-	double assign(double * A, const double * B)
+	Scalar assign(Scalar * A, const Scalar * B)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
@@ -237,9 +252,9 @@ class solver2d
 			}
 	}
 
-	void step(int axis, double dt)
+	void step(int axis, Scalar dt)
 	{
-		double L2_norm = 1.0;
+		Scalar L2_norm = 1.0;
 		assign(next_iteration_data, enthalpy_data);
 		while (L2_norm > 1e-3)
 		{
@@ -253,20 +268,20 @@ class solver2d
 
 
 public:
-	solver2d(mesh2d & mesh, const double * temperature_data) 
+	solver2d(mesh2d & mesh, const Scalar * temperature_data) 
 	{
 		this->mesh = mesh;
-		enthalpy_data = new double[mesh.get_number_of_nodes()];
-		current_iteration_data = new double [mesh.get_number_of_nodes()];
-		next_iteration_data = new double [mesh.get_number_of_nodes()];
+		enthalpy_data = new Scalar[mesh.get_number_of_nodes()];
+		current_iteration_data = new Scalar [mesh.get_number_of_nodes()];
+		next_iteration_data = new Scalar [mesh.get_number_of_nodes()];
 		set_enthalpy_by_T_data(temperature_data);
 
 		int max_n = std::max(mesh.get_num_x(), mesh.get_num_y());
-		a = new double[max_n];
-		b = new double[max_n];
-		c = new double[max_n];
-		f = new double[max_n];
-		x = new double[max_n];
+		a = new Scalar[max_n];
+		b = new Scalar[max_n];
+		c = new Scalar[max_n];
+		f = new Scalar[max_n];
+		x = new Scalar[max_n];
 	}
 
 	~solver2d()
@@ -282,13 +297,13 @@ public:
 		delete [] x;
 	}
 
-	void step(double dt)
+	void step(Scalar dt)
 	{
 		step(0, dt);
 		step(1, dt);
 	}
 
-	void save_to_vtk(std::string name)
+	void save_to_vtk(const std::string& name)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
@@ -329,8 +344,8 @@ public:
 			for (int i = 0; i < num_x; i++)
 			{
 				material_info & mi = mesh.get_material(i, j);
-				double T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
-				double state;
+				Scalar T = mi.get_T_by_enthalpy(enthalpy_data[i + j*num_x]);
+				Scalar state;
 				if (T <= mi.T1)
 					state = 0.0;
 				else if (T <= mi.T2)

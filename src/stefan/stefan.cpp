@@ -12,41 +12,40 @@
 #include "solver3d.hpp"
 
 
-
-
+using Scalar = double;
 
 int main()
 {
 	int num_x = 61;
 	int num_y = 61;
 	int num_z = 61;
-	double Lx = 6.0;
-	double Ly = 6.0;
-	double Lz = 6.0;
+	Scalar Lx = 6.0;
+	Scalar Ly = 6.0;
+	Scalar Lz = 6.0;
 
-	std::vector<material_info> mis;
-	mis.push_back(material_info(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
+	std::vector<material_info<Scalar>> mis;
+	mis.push_back(material_info<Scalar>(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
 	//mis.push_back(material_info(270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
 	//mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
 	//mis.push_back(material_info(50, 50, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
 	//mis.push_back(material_info(5000, 5000, 2837.0, 2837.0, 1.4, 1.4, 1e9, 1480, 1480));
 	
 
-	std::function<int(double, double, double)> mat_idx = []( double x, double y, double z )
+	std::function<int(Scalar, Scalar, Scalar)> mat_idx = []( Scalar /*x*/, Scalar /*y*/, Scalar /*z*/ )
 	{ 
 		return 0;
 	};
 
-	mesh3d mesh = mesh3d(num_x, num_y, num_z, Lx, Ly, Lz, mis, mat_idx);
+	auto mesh = mesh3d<Scalar>(num_x, num_y, num_z, Lx, Ly, Lz, mis, mat_idx);
 
-	double * td = new double [num_x * num_y * num_z];
+	Scalar* td = new Scalar [num_x * num_y * num_z];
 	for (int n = 0; n < num_x; ++n)
 		for (int i = 0; i < num_y; ++i)
 			for (int l = 0; l < num_y; ++l)
 			{
-				double x = n*Lx/(num_x-1);
-				double y = i*Ly/(num_y-1);
-				double z = l*Lz/(num_z-1);
+				Scalar x = n*Lx/(num_x-1);
+				Scalar y = i*Ly/(num_y-1);
+				Scalar z = l*Lz/(num_z-1);
 				if (x > 2 && x < 4 && y > 2 && y < 4 && z > 2 && z < 4)
 				{
 					td[n + i*num_x + l*num_x*num_y] = 272.0;
@@ -57,7 +56,7 @@ int main()
 				}
 			}
 
-	solver3d sol = solver3d(mesh, td);
+	auto sol = solver3d<Scalar>(mesh, td);
 	for (int i = 0; i < 3000; ++i)
 	{
 		if (i%10 == 0)
