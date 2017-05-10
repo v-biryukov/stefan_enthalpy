@@ -7,18 +7,53 @@
 #include <vector>
 #include <functional>
 
+#include "settings.h"
 #include "material_info.hpp"
 #include "solver2d.hpp"
 #include "solver3d.hpp"
-
+#include "../math/Spaces.h"
+#include "../mesh/MeshIO.h"
 
 using Scalar = double;
+
+using Space = Space3;
+
+using MaterialInfoIndex = int;
+
+std::vector<MaterialInfoIndex> loadMesh(
+	const std::string& fileName,
+	const typename Space::Vector& origin,
+	const Space::IndexVector& spacing,
+	Space::Vector& size)
+{
+	MeshIO<Space> meshIO;
+	meshIO.Load(AddExtensionToFileName(fileName, ".mesh"));
+
+	std::vector<MaterialInfoIndex> materialInfoIndices(spacing.GetVolume());
+
+	size = getAABB(meshIO).Size();
+
+	for (typename Space::IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
+	{
+
+	}
+
+	return materialInfoIndices;
+}
 
 int main()
 {
 	int num_x = 61;
 	int num_y = 61;
 	int num_z = 61;
+
+	const Space::Vector origin = Space::Vector::zero();
+	const Space::IndexVector spacing = { 61, 61, 61 };
+	Space::Vector size;
+
+	auto materialIndices = loadMesh("test.mesh", origin, spacing, size);
+
+
 	Scalar Lx = 6.0;
 	Scalar Ly = 6.0;
 	Scalar Lz = 6.0;

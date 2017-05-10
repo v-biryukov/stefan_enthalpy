@@ -36,7 +36,6 @@ struct Space2: public SpaceBase
   typedef AABB2<Scalar>                 AABB;
   typedef AABB2<IndexType>              IndexAABB;
   typedef AABB2<int>                    IntAABB;
-  typedef Tensor2<Scalar>               Tensor;
   typedef Space1                        BorderSpace;
 
   typedef Vector2< Vector2<Scalar> >    Jacobian;
@@ -64,7 +63,6 @@ struct Space3: public SpaceBase
   typedef AABB3<Scalar>                 AABB;
   typedef AABB3<IndexType>              IndexAABB;
   typedef AABB3<int>                    IntAABB;
-  typedef Tensor3<Scalar>               Tensor;
   typedef Vector3<Scalar>               Angle;
   typedef Vector3<Scalar>               DiagTensor;
 
@@ -82,7 +80,6 @@ struct Overload {};
   typedef typename Space::AABB          AABB; \
   typedef typename Space::Angle         Angle; \
   typedef typename Space::DiagTensor    DiagTensor; \
-  typedef typename Space::Tensor        Tensor; \
   typedef typename Space::Scalar        Scalar; \
   typedef typename Space::IndexType     IndexType; \
   typedef typename Space::IndexVector   IndexVector; \
@@ -99,7 +96,6 @@ struct Overload {};
   typedef Space2::AABB          AABB; \
   typedef Space2::Angle         Angle; \
   typedef Space2::DiagTensor    DiagTensor; \
-  typedef Space2::Tensor        Tensor; \
   typedef Space2::Scalar        Scalar; \
   typedef Space2::IndexType     IndexType; \
   typedef Space2::IndexVector   IndexVector; \
@@ -116,7 +112,6 @@ struct Overload {};
   typedef Space3::AABB          AABB; \
   typedef Space3::Angle         Angle; \
   typedef Space3::DiagTensor    DiagTensor; \
-  typedef Space3::Tensor        Tensor; \
   typedef Space3::Scalar        Scalar; \
   typedef Space3::IndexType     IndexType; \
   typedef Space3::IndexVector   IndexVector; \

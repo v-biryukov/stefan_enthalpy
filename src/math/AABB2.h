@@ -78,19 +78,23 @@ public:
   }
   void Expand(const T mult)
   {
-    Vector2<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     boxPoint1 -= size * (mult - T(1.0)) * T(0.5);
     boxPoint2 += size * (mult - T(1.0)) * T(0.5);
   }
   T Square() const //perimeter actually, used for AABBTree balancing
   {
-    Vector2<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     return (size.x + size.y) * T(2.0);
   }
   T Volume() const
   {
-    Vector2<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     return size.x * size.y;
+  }
+  Vector2<T> Size() const
+  {
+	  return boxPoint2 - boxPoint1;
   }
   Vector2<T> boxPoint1, boxPoint2;
 };

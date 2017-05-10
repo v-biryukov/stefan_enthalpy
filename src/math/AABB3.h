@@ -82,19 +82,23 @@ public:
   }
   void Expand(const T mult)
   {
-    Vector3<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     boxPoint1 -= size * (mult - T(1.0)) * T(0.5);
     boxPoint2 += size * (mult - T(1.0)) * T(0.5);
   }
   T Square() const
   {
-    Vector3<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     return (size.x * size.y + size.x * size.z + size.y * size.z) * T(2.0);
   }
   T Volume() const
   {
-    Vector3<T> size = boxPoint2 - boxPoint1;
+    const auto size = Size();
     return size.x * size.y * size.z;
+  }
+  Vector3<T> Size() const
+  {
+	  return boxPoint2 - boxPoint1;
   }
   Vector3<T> boxPoint1, boxPoint2;
 };

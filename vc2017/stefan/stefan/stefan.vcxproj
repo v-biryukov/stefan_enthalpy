@@ -140,9 +140,6 @@
     <ClInclude Include="..\..\..\src\math\QuadraturePrecomputer.h" />
     <ClInclude Include="..\..\..\src\math\Random.h" />
     <ClInclude Include="..\..\..\src\math\Spaces.h" />
-    <ClInclude Include="..\..\..\src\math\Tensor2.h" />
-    <ClInclude Include="..\..\..\src\math\Tensor3.h" />
-    <ClInclude Include="..\..\..\src\math\timer.h" />
     <ClInclude Include="..\..\..\src\math\Util.h" />
     <ClInclude Include="..\..\..\src\math\Vector2.h" />
     <ClInclude Include="..\..\..\src\math\Vector3.h" />
@@ -150,6 +147,7 @@
     <ClInclude Include="..\..\..\src\mesh\MeshIO.h" />
     <ClInclude Include="..\..\..\src\mesh\MeshIOBase.h" />
     <ClInclude Include="..\..\..\src\stefan\material_info.hpp" />
+    <ClInclude Include="..\..\..\src\stefan\settings.h" />
     <ClInclude Include="..\..\..\src\stefan\solver2d.hpp" />
     <ClInclude Include="..\..\..\src\stefan\solver3d.hpp" />
     <ClInclude Include="..\..\..\src\utils\Base64.h" />
