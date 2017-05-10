@@ -6,6 +6,7 @@
 #include <math.h>
 #include <vector>
 #include <functional>
+#include <array>
 
 #include "settings.h"
 #include "material_info.hpp"
@@ -20,22 +21,113 @@ using Space = Space3;
 
 using MaterialInfoIndex = int;
 
+
+
 std::vector<MaterialInfoIndex> loadMesh(
 	const std::string& fileName,
 	const typename Space::Vector& origin,
 	const Space::IndexVector& spacing,
 	Space::Vector& size)
 {
+	SPACE_TYPEDEFS;
+
 	MeshIO<Space> meshIO;
 	meshIO.Load(AddExtensionToFileName(fileName, ".mesh"));
 
-	std::vector<MaterialInfoIndex> materialInfoIndices(spacing.GetVolume());
+	std::string paramsFileName = AddExtensionToFileName(fileName, ".params");
+	FILE* paramsFile = fopen(paramsFileName.c_str(), "rb");
+
+	std::vector<MaterialInfoIndex> cellMaterialInfos(meshIO.GetCellsCount());
+
+	if (paramsFile)
+	{
+		for (IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
+		{
+			char currCellSubmeshIndex = char(-1);
+			IndexType bytesRead = fread(&currCellSubmeshIndex, sizeof(char), 1, paramsFile);
+			assert(bytesRead == 1);
+
+			cellMaterialInfos[cellIndex] = currCellSubmeshIndex;
+		}
+		fclose(paramsFile);
+	}
+
+
+	std::vector<MaterialInfoIndex> materialInfoIndices(spacing.GetVolume(), 0 /* todo: default value from config */);
+
+	auto aabb = getAABB(meshIO);
 
 	size = getAABB(meshIO).Size();
 
-	for (typename Space::IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
+	for (IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
 	{
+		Vector points[Space::NodesPerCell];
+		for (IndexType nodeNumber = 0; nodeNumber < Space::NodesPerCell; ++nodeNumber)
+		{
+			auto nodeIndex = meshIO.indices[cellIndex * Space::NodesPerCell + nodeNumber];
+			points[nodeNumber] = meshIO.vertices[nodeIndex];
+		}
 
+		std::array<Scalar, Space::Dimension> mins;
+		std::array<Scalar, Space::Dimension> maxs;
+
+		for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+		{
+			maxs[dimIndex] = mins[dimIndex] = points[0].Get(dimIndex);
+		}
+
+		for (auto nodeNumber = 0; nodeNumber < Space::NodesPerCell; ++nodeNumber)
+		{
+			for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+			{
+				if (points[nodeNumber].Get(dimIndex) < mins[dimIndex]) mins[dimIndex] = points[nodeNumber].Get(dimIndex);
+				if (points[nodeNumber].Get(dimIndex) > maxs[dimIndex]) maxs[dimIndex] = points[nodeNumber].Get(dimIndex);
+			}
+		}
+
+		std::array<int, Space::Dimension> imins;
+		std::array<int, Space::Dimension> imaxs;
+
+		for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+		{
+			auto adjustValueToRange = [](auto& value, const auto& minValue, const auto& maxValue)
+			{
+				assert(minValue <= maxValue);
+				if (value < minValue) value = minValue;
+				if (value > maxValue) value = maxValue;
+			};
+
+			auto minRefValue = (mins[dimIndex] - aabb.boxPoint1.Get(dimIndex)) / (aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex));
+			imins[dimIndex] = int(minRefValue * (spacing.Get(dimIndex) - 1));
+
+			auto maxRefValue = (maxs[dimIndex] - aabb.boxPoint1.Get(dimIndex)) / (aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex));
+			imaxs[dimIndex] = int(maxRefValue * (spacing.Get(dimIndex) - 1)) + 1;
+
+			adjustValueToRange(imins[dimIndex], 0, spacing.Get(dimIndex) - 1);
+			adjustValueToRange(imaxs[dimIndex], 0, spacing.Get(dimIndex) - 1);
+		}
+
+		Vector pointToCheck;
+
+		std::function<void(int)> checkPoints;
+		checkPoints = [&](int dimIndex)
+		{
+			if (dimIndex == Space::Dimension)
+			{
+				if (PointInCell<Scalar>(points, pointToCheck))
+				{
+					destData[y * width + x] = e;
+				}
+			} else
+			{ 
+				for (int coord = imins[dimIndex]; coord <= imaxs[dimIndex]; ++coord)
+				{
+					pointToCheck[dimIndex] = aabb.boxPoint1.Get(dimIndex) +
+						(aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex)) * coord / Scalar(spacing.Get(dimIndex) - 1);
+					checkPoints(dimIndex + 1);
+				}
+			}
+		};
 	}
 
 	return materialInfoIndices;
