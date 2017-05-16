@@ -1,13 +1,6 @@
 #include <algorithm>
 
 template <typename Space>
-MeshIO<Space>::MeshIO(): 
-  contactTypesCount(0),
-  boundaryTypesCount(0)
-{
-}
-
-template <typename Space>
 void MeshIO<Space>::Load(const std::string& fileName, IO::FileType fileType)
 {
   std::fstream file;

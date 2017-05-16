@@ -30,6 +30,7 @@ struct Space2: public SpaceBase
   const   static IndexType              FacesPerCell = EdgesPerCell;
   typedef Vector2<IndexType>            IndexVector;
   typedef Vector2<Scalar>               Vector;
+  typedef Vector2<int>					iVector;
   typedef Vector2<Scalar>               Vector2T;
   typedef Vector3<Scalar>               Vector3T;
   typedef Coordinates2<Scalar>          Coords;
@@ -57,6 +58,7 @@ struct Space3: public SpaceBase
   const   static IndexType              NodesPerEdge = 2;
   typedef Vector3<IndexType>            IndexVector;
   typedef Vector3<Scalar>               Vector;
+  typedef Vector3<int>					iVector;
   typedef Vector2<Scalar>               Vector2T;
   typedef Vector3<Scalar>               Vector3T;
   typedef Coordinates3<Scalar>          Coords;
@@ -88,7 +90,8 @@ struct Overload {};
   typedef typename Space::Vector2T      Vector2; \
   typedef typename Space::Vector3T      Vector3; \
   typedef typename Space::BorderSpace   BorderSpace; \
-  typedef typename Space::Jacobian Jacobian; 
+  typedef typename Space::Jacobian      Jacobian; \
+  typedef typename Space::iVector       iVector;
 
 #define SPACE2_TYPEDEFS \
   typedef Space2::Vector        Vector; \
@@ -104,7 +107,8 @@ struct Overload {};
   typedef Space2::Vector2T      Vector2; \
   typedef Space2::Vector3T      Vector3; \
   typedef Space2::BorderSpace   BorderSpace; \
-  typedef Space2::Jacobian Jacobian; 
+  typedef Space2::Jacobian      Jacobian; \ 
+typedef Space2::iVector       iVector;
 
 #define SPACE3_TYPEDEFS \
   typedef Space3::Vector        Vector; \
@@ -120,4 +124,5 @@ struct Overload {};
   typedef Space3::Vector2T      Vector2; \
   typedef Space3::Vector3T      Vector3; \
   typedef Space3::BorderSpace   BorderSpace; \
-  typedef Space3::Jacobian Jacobian; 
+  typedef Space3::Jacobian      Jacobian; \
+  typedef Space3::iVector       iVector;

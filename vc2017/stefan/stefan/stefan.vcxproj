@@ -122,11 +122,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\io\vtk\BasicVtkWriter.h" />
-    <ClInclude Include="..\..\..\src\io\vtk\CellInfoVtkWriter.h" />
-    <ClInclude Include="..\..\..\src\io\vtk\ContactVtkWriter.h" />
-    <ClInclude Include="..\..\..\src\io\vtk\MeshVtkWriter.h" />
-    <ClInclude Include="..\..\..\src\io\vtk\SnapshotVtkWriter.h" />
-    <ClInclude Include="..\..\..\src\io\vtk\VtkReader.h" />
     <ClInclude Include="..\..\..\src\math\AABB2.h" />
     <ClInclude Include="..\..\..\src\math\AABB3.h" />
     <ClInclude Include="..\..\..\src\math\Collisions.h" />
@@ -145,7 +140,6 @@
     <ClInclude Include="..\..\..\src\math\Vector3.h" />
     <ClInclude Include="..\..\..\src\math\VectorMaths.h" />
     <ClInclude Include="..\..\..\src\mesh\MeshIO.h" />
-    <ClInclude Include="..\..\..\src\mesh\MeshIOBase.h" />
     <ClInclude Include="..\..\..\src\stefan\material_info.hpp" />
     <ClInclude Include="..\..\..\src\stefan\settings.h" />
     <ClInclude Include="..\..\..\src\stefan\solver2d.hpp" />
@@ -157,11 +151,7 @@
     <ClCompile Include="..\..\..\src\stefan\stefan.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\io\vtk\CellInfoVtkWriter.inl" />
-    <None Include="..\..\..\src\io\vtk\ContactVtkWriter.inl" />
     <None Include="..\..\..\src\mesh\MeshIO.inl" />
-    <None Include="..\..\..\src\mesh\MeshIO2.inl" />
-    <None Include="..\..\..\src\mesh\MeshIO3.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

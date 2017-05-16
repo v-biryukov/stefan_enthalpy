@@ -2,6 +2,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <cstdio>
+#include <cstdlib>
 
 #include <math.h>
 #include <vector>
@@ -16,32 +18,53 @@
 #include "../mesh/MeshIO.h"
 
 using Scalar = double;
-
 using Space = Space3;
-
 using MaterialInfoIndex = int;
 
 
+template <typename Space>
+typename Space::IndexType idx(const typename Space::IndexVector& coord, const typename Space::IndexVector& stride)
+{
+	Space::IndexType resultIdx = 0;
+
+	for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+	{
+		resultIdx = coord.Get(dimIndex) + (dimIndex > 0 ? stride.Get(dimIndex) : 0) * resultIdx;
+	}
+	return resultIdx;
+
+	//return coord.x + coord.y * stride.x + coord.z * stride.x * stride.y;
+}
+
+template <typename T>
+void adjustValueToRange(T& value, const T& minValue, const T& maxValue)
+{
+	assert(minValue <= maxValue);
+	if (value < minValue) value = minValue;
+	if (value > maxValue) value = maxValue;
+}
 
 std::vector<MaterialInfoIndex> loadMesh(
 	const std::string& fileName,
-	const typename Space::Vector& origin,
-	const Space::IndexVector& spacing,
-	Space::Vector& size)
+	const Space::IndexVector& stride,
+	Space::AABB& meshAABB)
 {
 	SPACE_TYPEDEFS;
 
 	MeshIO<Space> meshIO;
-	meshIO.Load(AddExtensionToFileName(fileName, ".mesh"));
+	meshIO.Load(AddExtensionToFileName(fileName, ".mesh"), IO::Ascii);
+	meshAABB = getAABB(meshIO);
 
 	std::string paramsFileName = AddExtensionToFileName(fileName, ".params");
-	FILE* paramsFile = fopen(paramsFileName.c_str(), "rb");
+	FILE* paramsFile = nullptr;
+	fopen_s(&paramsFile, paramsFileName.c_str(), "rb");
+	assert(paramsFile);
 
 	std::vector<MaterialInfoIndex> cellMaterialInfos(meshIO.GetCellsCount());
 
 	if (paramsFile)
 	{
-		for (IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
+		for (auto cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
 		{
 			char currCellSubmeshIndex = char(-1);
 			IndexType bytesRead = fread(&currCellSubmeshIndex, sizeof(char), 1, paramsFile);
@@ -52,13 +75,8 @@ std::vector<MaterialInfoIndex> loadMesh(
 		fclose(paramsFile);
 	}
 
-
-	std::vector<MaterialInfoIndex> materialInfoIndices(spacing.GetVolume(), 0 /* todo: default value from config */);
-
-	auto aabb = getAABB(meshIO);
-
-	size = getAABB(meshIO).Size();
-
+	std::vector<MaterialInfoIndex> materialInfoIndices(stride.GetVolume(), 0 /* todo: default value from config */);
+	
 	for (IndexType cellIndex = 0; cellIndex < meshIO.GetCellsCount(); ++cellIndex)
 	{
 		Vector points[Space::NodesPerCell];
@@ -90,44 +108,40 @@ std::vector<MaterialInfoIndex> loadMesh(
 
 		for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
 		{
-			auto adjustValueToRange = [](auto& value, const auto& minValue, const auto& maxValue)
-			{
-				assert(minValue <= maxValue);
-				if (value < minValue) value = minValue;
-				if (value > maxValue) value = maxValue;
-			};
+			auto minRefValue = (mins[dimIndex] - meshAABB.boxPoint1.Get(dimIndex)) / (meshAABB.boxPoint2.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex));
+			imins[dimIndex] = int(minRefValue * (stride.Get(dimIndex) - 1));
 
-			auto minRefValue = (mins[dimIndex] - aabb.boxPoint1.Get(dimIndex)) / (aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex));
-			imins[dimIndex] = int(minRefValue * (spacing.Get(dimIndex) - 1));
+			auto maxRefValue = (maxs[dimIndex] - meshAABB.boxPoint1.Get(dimIndex)) / (meshAABB.boxPoint2.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex));
+			imaxs[dimIndex] = int(maxRefValue * (stride.Get(dimIndex) - 1)) + 1;
 
-			auto maxRefValue = (maxs[dimIndex] - aabb.boxPoint1.Get(dimIndex)) / (aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex));
-			imaxs[dimIndex] = int(maxRefValue * (spacing.Get(dimIndex) - 1)) + 1;
-
-			adjustValueToRange(imins[dimIndex], 0, spacing.Get(dimIndex) - 1);
-			adjustValueToRange(imaxs[dimIndex], 0, spacing.Get(dimIndex) - 1);
+			adjustValueToRange<int>(imins[dimIndex], 0, stride.Get(dimIndex) - 1);
+			adjustValueToRange<int>(imaxs[dimIndex], 0, stride.Get(dimIndex) - 1);
 		}
 
 		Vector pointToCheck;
+		IndexVector iv;
 
-		std::function<void(int)> checkPoints;
-		checkPoints = [&](int dimIndex)
+		std::function<void(int)> checkPoints = [&](int dimIndex)
 		{
 			if (dimIndex == Space::Dimension)
 			{
 				if (PointInCell<Scalar>(points, pointToCheck))
 				{
-					destData[y * width + x] = e;
+					materialInfoIndices[idx<Space>(iv, stride)] = cellMaterialInfos[cellIndex];
 				}
 			} else
 			{ 
 				for (int coord = imins[dimIndex]; coord <= imaxs[dimIndex]; ++coord)
 				{
-					pointToCheck[dimIndex] = aabb.boxPoint1.Get(dimIndex) +
-						(aabb.boxPoint2.Get(dimIndex) - aabb.boxPoint1.Get(dimIndex)) * coord / Scalar(spacing.Get(dimIndex) - 1);
+					pointToCheck[dimIndex] = meshAABB.boxPoint1.Get(dimIndex) +
+						(meshAABB.boxPoint2.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex)) * coord / Scalar(stride.Get(dimIndex) - 1);
+					iv[dimIndex] = coord;
 					checkPoints(dimIndex + 1);
 				}
 			}
 		};
+
+		checkPoints(0);
 	}
 
 	return materialInfoIndices;
@@ -135,55 +149,61 @@ std::vector<MaterialInfoIndex> loadMesh(
 
 int main()
 {
-	int num_x = 61;
-	int num_y = 61;
-	int num_z = 61;
+	SPACE_TYPEDEFS;
 
-	const Space::Vector origin = Space::Vector::zero();
-	const Space::IndexVector spacing = { 61, 61, 61 };
-	Space::Vector size;
+	const Space::IndexVector stride = { 61, 61, 61 };
+	Space::AABB meshAABB;
 
-	auto materialIndices = loadMesh("test.mesh", origin, spacing, size);
-
-
-	Scalar Lx = 6.0;
-	Scalar Ly = 6.0;
-	Scalar Lz = 6.0;
+	auto materialIndices = loadMesh("./meshes/test", stride, meshAABB);
 
 	std::vector<material_info<Scalar>> mis;
-	mis.push_back(material_info<Scalar>(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
-	//mis.push_back(material_info(270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
+	mis.push_back({ 267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0 });
+	mis.push_back({ 270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0 });
 	//mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
 	//mis.push_back(material_info(50, 50, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
 	//mis.push_back(material_info(5000, 5000, 2837.0, 2837.0, 1.4, 1.4, 1e9, 1480, 1480));
 	
 
-	std::function<int(Scalar, Scalar, Scalar)> mat_idx = []( Scalar /*x*/, Scalar /*y*/, Scalar /*z*/ )
+	std::function<material_info<Scalar>(const typename Space::Vector&)> materialParamsGetter = [&mis, &meshAABB, &stride, &materialIndices](const typename Space::Vector& point)
 	{ 
-		return 0;
+		Space::iVector iv;
+
+		for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+		{
+			auto refValue = (point.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex)) / (meshAABB.boxPoint2.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex));
+			iv[dimIndex] = int(refValue * (stride.Get(dimIndex) - 1));
+			adjustValueToRange<int>(iv[dimIndex], 0, stride.Get(dimIndex) - 1);
+		}
+
+		auto index = idx<Space>(iv, stride);
+		return mis.at(materialIndices.at(index));
 	};
 
-	auto mesh = mesh3d<Scalar>(num_x, num_y, num_z, Lx, Ly, Lz, mis, mat_idx);
+	const auto meshSize = meshAABB.Size();
+	auto mesh = mesh3d<Space>(stride, meshAABB, materialParamsGetter);
 
-	Scalar* td = new Scalar [num_x * num_y * num_z];
-	for (int n = 0; n < num_x; ++n)
-		for (int i = 0; i < num_y; ++i)
-			for (int l = 0; l < num_y; ++l)
+	// set initial temperature
+	std::vector<Scalar> td(stride.GetVolume(), 0 /* todo: default value from config */);
+					
+	for (IndexType l = 0; l < stride.z; ++l)
+		for (IndexType i = 0; i < stride.y; ++i)
+			for (IndexType n = 0; n < stride.x; ++n)
 			{
-				Scalar x = n*Lx/(num_x-1);
-				Scalar y = i*Ly/(num_y-1);
-				Scalar z = l*Lz/(num_z-1);
-				if (x > 2 && x < 4 && y > 2 && y < 4 && z > 2 && z < 4)
+				Scalar x = meshAABB.boxPoint1.x + meshSize.x * n / (stride.x - 1);
+				Scalar y = meshAABB.boxPoint1.y + meshSize.y * i / (stride.y - 1);
+				Scalar z = meshAABB.boxPoint1.z + meshSize.z * l / (stride.z - 1);
+//				if (x > 2 && x < 4 && y > 2 && y < 4 && z > 2 && z < 4)
+				if (materialIndices[idx<Space>({ n, i, l }, stride)] == 0)
 				{
-					td[n + i*num_x + l*num_x*num_y] = 272.0;
+					td[idx<Space>({n, i, l}, stride)] = 272.0;
 				}
 				else
 				{
-					td[n + i*num_x + l*num_x*num_y] = 303.0;
+					td[idx<Space>({ n, i, l }, stride)] = 303.0;
 				}
 			}
 
-	auto sol = solver3d<Scalar>(mesh, td);
+	auto sol = solver3d<Space>(mesh, td.data());
 	for (int i = 0; i < 3000; ++i)
 	{
 		if (i%10 == 0)
@@ -195,7 +215,7 @@ int main()
 		}
 		sol.step(1000);	
 	}
-	delete [] td;
+
 	return 0;
 }
 

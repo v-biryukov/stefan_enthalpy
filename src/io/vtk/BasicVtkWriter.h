@@ -4,7 +4,7 @@
 #include <fstream>
 #include <algorithm>
 
-#include "../../Maths/Spaces.h"
+#include "../../math/Spaces.h"
 
 template <typename Space>
 class BasicVtkWriter

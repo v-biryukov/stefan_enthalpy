@@ -1,14 +1,12 @@
 #pragma once
 
 #include "MeshIOBase.h"
-#include "../io/vtk/MeshVtkWriter.h"
 #include "../utils/Utils.h"
 
 template <typename Space>
 struct MeshIO
 {
   SPACE_TYPEDEFS
-  MeshIO();
   virtual ~MeshIO() = default;
   virtual void Load(const std::string& fileName, IO::FileType fileType = IO::Binary);
 

@@ -6,66 +6,65 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
+#include "../math/Spaces.h"
 
-template <typename Scalar>
+template <typename Space>
 class mesh3d
 {
-	int num_x;
-	int num_y;
-	int num_z;
-	int number_of_nodes;
-	Scalar Lx;
-	Scalar Ly;
-	Scalar Lz;
+	SPACE_TYPEDEFS;
+
+	IndexVector stride;
+	AABB aabb;
+
 	Scalar hx;
 	Scalar hy;
 	Scalar hz;
 
+	using MaterialParamsGetter = std::function<material_info<Scalar>(const Vector&)>;
 
-	std::vector<material_info<Scalar>> material_infos;
-	std::function<int(Scalar, Scalar, Scalar)> material_index;
+	MaterialParamsGetter materialParamsGetter;
 
 public:
 
 	mesh3d()
 	{
 	}
-	mesh3d(int num_x, int num_y, int num_z, Scalar Lx, Scalar Ly, Scalar Lz, std::vector<material_info<Scalar>> material_infos, 
-		std::function<int(Scalar, Scalar, Scalar)> material_index) 
-		: num_x(num_x), num_y(num_y), num_z(num_z), Lx(Lx), Ly(Ly), Lz(Lz), material_infos(material_infos), material_index(material_index)
+	mesh3d(const IndexVector& stride, const AABB& aabb,
+		MaterialParamsGetter materialParamsGetter)
+		: stride(stride), aabb(aabb), materialParamsGetter(materialParamsGetter)
 	{
-		hx = Lx / (num_x-1);
-		hy = Ly / (num_y-1);
-		hz = Lz / (num_z-1);
-		number_of_nodes = num_x * num_y * num_z;
+		auto size = aabb.Size();
+		hx = size.x / (stride.x - 1);
+		hy = size.y / (stride.y - 1);
+		hz = size.z / (stride.z - 1);
 	}
 
-	const material_info<Scalar>& get_material(int n, int i, int l) const
+	material_info<Scalar> get_material(int n, int i, int l) const
 	{
-		return material_infos[material_index(n*hx, i*hy, l*hz)];
+		return materialParamsGetter(aabb.boxPoint1 + Vector(n * hx, i * hy, l * hz));
 	}
 
-	material_info<Scalar>& get_material(int n, int i)
+	/*material_info<Scalar>& get_material(int n, int i)
 	{
 		return const_cast<material_info<Scalar>&>(const_cast<const material_info<Scalar>*>(this)->get_material(n, i, l));
-	}
+	}*/
 
-	inline Scalar get_Lx() const {return Lx;}
-	inline Scalar get_Ly() const {return Ly;}
-	inline Scalar get_Lz() const {return Lz;}
+	IndexVector getStride() const { return stride; }
 	inline Scalar get_hx() const {return hx;}
 	inline Scalar get_hy() const {return hy;}
 	inline Scalar get_hz() const {return hz;}
-	inline int get_num_x() const {return num_x;}
-	inline int get_num_y() const {return num_y;}
-	inline int get_num_z() const {return num_z;}
-	inline int get_number_of_nodes() const {return number_of_nodes;}
+	inline int get_num_x() const {return static_cast<int>(stride.x);}
+	inline int get_num_y() const {return static_cast<int>(stride.y);}
+	inline int get_num_z() const {return static_cast<int>(stride.z);}
+	inline IndexType get_number_of_nodes() const {return stride.GetVolume();}
 };
 
-template <typename Scalar>
+template <typename Space>
 class solver3d
 {
-	mesh3d<Scalar> mesh;
+	SPACE_TYPEDEFS;
+
+	mesh3d<Space> mesh;
 
 	Scalar * enthalpy_data;
 	Scalar * current_iteration_data;
@@ -74,17 +73,21 @@ class solver3d
 	// Auxiliary arrays for tridiagonal method
 	Scalar *a, *b, *c, *f, *x;
 
-	inline int id(int n, int i, int l) {return n + i*mesh.get_num_x() + l * mesh.get_num_x() * mesh.get_num_y();}
+	inline IndexType id(IndexType n, IndexType i, IndexType l) { return idx<Space>({n, i, l}, mesh.getStride()); }
 
 	void set_enthalpy_by_T_data(const Scalar * temperature_data)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
 		int num_z = mesh.get_num_z();
-		for (int i = 0; i < num_y; ++i)
-			for (int n = 0; n < num_x; ++n)
+
+		for (int n = 0; n < num_x; ++n)
+			for (int i = 0; i < num_y; ++i)
 				for (int l = 0; l < num_z; ++l)
-					enthalpy_data[id(n,i,l)] = mesh.get_material(n, i, l).get_enthalpy_by_T(temperature_data[id(n,i,l)]);
+				{
+					const auto index = id(n, i, l);
+					enthalpy_data[index] = mesh.get_material(n, i, l).get_enthalpy_by_T(temperature_data[index]);
+				}
 	}
 
 	void iterate_tridiagonal(int axis, 
@@ -286,7 +289,7 @@ class solver3d
 
 
 public:
-	solver3d(mesh3d<Scalar>& mesh, const Scalar * temperature_data) 
+	solver3d(const mesh3d<Space>& mesh, const Scalar* temperature_data) 
 	{
 		this->mesh = mesh;
 		enthalpy_data = new Scalar[mesh.get_number_of_nodes()];
@@ -294,7 +297,7 @@ public:
 		next_iteration_data = new Scalar [mesh.get_number_of_nodes()];
 		set_enthalpy_by_T_data(temperature_data);
 
-		int max_n = std::max(std::max(mesh.get_num_x(), mesh.get_num_y()), mesh.get_num_z());
+		int max_n = std::max({ mesh.get_num_x(), mesh.get_num_y(), mesh.get_num_z() });
 		a = new Scalar[max_n];
 		b = new Scalar[max_n];
 		c = new Scalar[max_n];
@@ -322,7 +325,7 @@ public:
 		step(2, dt);
 	}
 
-	void save_to_vtk(std::string name)
+	void save_to_vtk(const std::string& name)
 	{
 		int num_x = mesh.get_num_x();
 		int num_y = mesh.get_num_y();
