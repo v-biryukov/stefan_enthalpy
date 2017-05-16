@@ -17,23 +17,24 @@
 #include "../math/Spaces.h"
 #include "../mesh/MeshIO.h"
 
-using Scalar = double;
-using Space = Space3;
+using Space = Space2;
 using MaterialInfoIndex = int;
 
 
 template <typename Space>
 typename Space::IndexType idx(const typename Space::IndexVector& coord, const typename Space::IndexVector& stride)
 {
-	Space::IndexType resultIdx = 0;
+	SPACE_TYPEDEFS;
+
+	IndexType resultIdx = 0;
+	IndexType mult = 1;
 
 	for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
 	{
-		resultIdx = coord.Get(dimIndex) + (dimIndex > 0 ? stride.Get(dimIndex) : 0) * resultIdx;
+		resultIdx += coord.Get(dimIndex) * mult;
+		mult *= stride.Get(dimIndex);
 	}
 	return resultIdx;
-
-	//return coord.x + coord.y * stride.x + coord.z * stride.x * stride.y;
 }
 
 template <typename T>
@@ -147,6 +148,7 @@ std::vector<MaterialInfoIndex> loadMesh(
 	return materialInfoIndices;
 }
 
+	/*
 int main()
 {
 	SPACE_TYPEDEFS;
@@ -183,7 +185,7 @@ int main()
 	auto mesh = mesh3d<Space>(stride, meshAABB, materialParamsGetter);
 
 	// set initial temperature
-	std::vector<Scalar> td(stride.GetVolume(), 0 /* todo: default value from config */);
+	std::vector<Scalar> td(stride.GetVolume(), 0); // todo: default value from config 
 					
 	for (IndexType l = 0; l < stride.z; ++l)
 		for (IndexType i = 0; i < stride.y; ++i)
@@ -218,63 +220,60 @@ int main()
 
 	return 0;
 }
+*/
 
-
-
-
-/*
 int main()
 {
-	int num_x = 241;
-	int num_y = 121;
-	double Lx = 12.0;
-	double Ly = 6.0;
+	SPACE_TYPEDEFS;
 
-	std::vector<material_info> mis;
-	mis.push_back(material_info(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
-	mis.push_back(material_info(270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
-	mis.push_back(material_info(273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0));
-	mis.push_back(material_info(50, 50, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0));
-	mis.push_back(material_info(5000, 5000, 2837.0, 2837.0, 1.4, 1.4, 1e9, 1480, 1480));
+	const IndexVector stride = { 241, 121 };
+	AABB meshAABB;
+
+	std::vector<material_info<Scalar>> mis;
+	mis.push_back({ 267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0 });
+	mis.push_back({ 270, 270, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0 });
+	mis.push_back({ 273, 273, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 2100.0 });
+	mis.push_back({ 50, 50, 1.3, 1.3, 0.0243, 0.0243, 1e9, 1005.0, 1005.0 });
+	mis.push_back({ 5000, 5000, 2837.0, 2837.0, 1.4, 1.4, 1e9, 1480, 1480 });
 	
+	auto materialIndices = loadMesh("./meshes/test2", stride, meshAABB);
 
-	std::function<int(double, double)> mat_idx = []( double x, double y )
-	{ 
-		if (y <= 1)
-			return 4;
-		else if (y < 2)
-			return 2;
-		else if (y < 3)
-			return 1;
-		else if (y < 4 || ((y<4.5) && (x>4) && (x<8)))
-			return 0;
-		else
-			return 3;
+	std::function<material_info<Scalar>(const Vector&)> materialParamsGetter = 
+		[&mis, &meshAABB, &stride, &materialIndices](const Vector& point)
+	{
+		iVector iv;
+
+		for (auto dimIndex = 0; dimIndex < Space::Dimension; ++dimIndex)
+		{
+			auto refValue = (point.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex)) / (meshAABB.boxPoint2.Get(dimIndex) - meshAABB.boxPoint1.Get(dimIndex));
+			iv[dimIndex] = int(refValue * (stride.Get(dimIndex) - 1));
+			adjustValueToRange<int>(iv[dimIndex], 0, stride.Get(dimIndex) - 1);
+		}
+
+		auto index = idx<Space>(iv, stride);
+		return mis.at(materialIndices.at(index));
 	};
 
-	mesh2d mesh = mesh2d(num_x, num_y, Lx, Ly, mis, mat_idx);
+	const auto meshSize = meshAABB.Size();
+	auto mesh = mesh2d<Space>(stride, meshAABB, materialParamsGetter);
 
-	double * td = new double [num_x * num_y];
-	for (int n = 0; n < num_x; ++n)
-		for (int i = 0; i < num_y; ++i)
+	std::vector<Scalar> td(stride.GetVolume());
+
+	for (IndexType n = 0; n < stride.x; ++n)
+		for (IndexType i = 0; i < stride.y; ++i)
 		{
-			double x = n*Lx/(num_x-1);
-			double y = i*Ly/(num_y-1);
-			if ((x > 4 && x < 8 && y > 1 && y < 4.5))
+			//double x = meshAABB.boxPoint1.x + meshSize.x * n / (stride.x - 1);
+			//double y = meshAABB.boxPoint1.y + meshSize.y * n / (stride.y - 1);
+			if (materialIndices[idx<Space>({ n, i }, stride)] == 0)
 			{
-				td[n + i*num_x] = 263.0;
-			}
-			else if (y <= 1)
+				td[idx<Space>({ n, i }, stride)] = 263.0;
+			} else
 			{
-				td[n + i*num_x] = 273.0;
-			}
-			else
-			{
-				td[n + i*num_x] = 303.0;
+				td[idx<Space>({ n, i }, stride)] = 273.0;
 			}
 		}
 
-	solver2d sol = solver2d(mesh, td);
+	auto sol = solver2d<Space>(mesh, td.data());
 	for (int i = 0; i < 300; ++i)
 	{
 		if (i%10 == 0)
@@ -286,7 +285,5 @@ int main()
 		}
 		sol.step(300);	
 	}
-	delete [] td;
 	return 0;
 }
-*/

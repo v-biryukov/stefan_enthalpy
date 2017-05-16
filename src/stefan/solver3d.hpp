@@ -26,9 +26,8 @@ class mesh3d
 
 public:
 
-	mesh3d()
-	{
-	}
+	mesh3d() = default;
+
 	mesh3d(const IndexVector& stride, const AABB& aabb,
 		MaterialParamsGetter materialParamsGetter)
 		: stride(stride), aabb(aabb), materialParamsGetter(materialParamsGetter)
@@ -43,11 +42,6 @@ public:
 	{
 		return materialParamsGetter(aabb.boxPoint1 + Vector(n * hx, i * hy, l * hz));
 	}
-
-	/*material_info<Scalar>& get_material(int n, int i)
-	{
-		return const_cast<material_info<Scalar>&>(const_cast<const material_info<Scalar>*>(this)->get_material(n, i, l));
-	}*/
 
 	IndexVector getStride() const { return stride; }
 	inline Scalar get_hx() const {return hx;}
@@ -352,7 +346,7 @@ public:
 			for (int i = 0; i < num_y; i++)
 				for (int n = 0; n < num_x; n++)
 				{
-					const material_info<Scalar>& mi = mesh.get_material(n, i, l);
+					auto mi = mesh.get_material(n, i, l);
 					vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[id(n, i, l)]) << "\n";
 				}
 		vtk_file << "SCALARS K FLOAT\n";
@@ -361,7 +355,7 @@ public:
 			for (int i = 0; i < num_y; i++)
 				for (int n = 0; n < num_x; n++)
 				{
-					const material_info<Scalar>& mi = mesh.get_material(n, i, l);
+					auto mi = mesh.get_material(n, i, l);
 					vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[id(n, i, l)]) << "\n";
 				}
 		vtk_file << "SCALARS state FLOAT\n";
@@ -370,7 +364,7 @@ public:
 			for (int i = 0; i < num_y; i++)
 				for (int n = 0; n < num_x; n++)
 				{
-					const material_info<Scalar>& mi = mesh.get_material(n, i, l);
+					auto mi = mesh.get_material(n, i, l);
 					Scalar T = mi.get_T_by_enthalpy(enthalpy_data[id(n, i, l)]);
 					Scalar state;
 					if (T <= mi.T1)
