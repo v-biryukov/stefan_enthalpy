@@ -215,6 +215,11 @@ struct Vector3
     return Vector3<T>(Abs(x), Abs(y), Abs(z));
   }
 
+  inline T ComponentMax() const
+  {
+	  return std::max({ x, y, z });
+  }
+
   inline Vector3<T> operator^(const Vector3<T> &v) const
   {
       return Vector3<T>(this->y * v.z - v.y * this->z,

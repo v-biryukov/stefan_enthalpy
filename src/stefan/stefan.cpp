@@ -9,6 +9,8 @@
 #include <vector>
 #include <functional>
 #include <array>
+#include <algorithm>
+
 
 #include "settings.h"
 #include "material_info.hpp"
@@ -17,7 +19,7 @@
 #include "../math/Spaces.h"
 #include "../mesh/MeshIO.h"
 
-using Space = Space2;
+using Space = Space3;
 using MaterialInfoIndex = int;
 
 
@@ -35,14 +37,6 @@ typename Space::IndexType idx(const typename Space::IndexVector& coord, const ty
 		mult *= stride.Get(dimIndex);
 	}
 	return resultIdx;
-}
-
-template <typename T>
-void adjustValueToRange(T& value, const T& minValue, const T& maxValue)
-{
-	assert(minValue <= maxValue);
-	if (value < minValue) value = minValue;
-	if (value > maxValue) value = maxValue;
 }
 
 std::vector<MaterialInfoIndex> loadMesh(
@@ -148,7 +142,7 @@ std::vector<MaterialInfoIndex> loadMesh(
 	return materialInfoIndices;
 }
 
-	/*
+
 int main()
 {
 	SPACE_TYPEDEFS;
@@ -182,7 +176,7 @@ int main()
 	};
 
 	const auto meshSize = meshAABB.Size();
-	auto mesh = mesh3d<Space>(stride, meshAABB, materialParamsGetter);
+	auto mesh = Mesh<Space>(stride, meshAABB, materialParamsGetter);
 
 	// set initial temperature
 	std::vector<Scalar> td(stride.GetVolume(), 0); // todo: default value from config 
@@ -191,6 +185,8 @@ int main()
 		for (IndexType i = 0; i < stride.y; ++i)
 			for (IndexType n = 0; n < stride.x; ++n)
 			{
+				//const Vector step = meshSize.ComponentDivide(stride - Vector::one());
+				//const Vector point = meshAABB.boxPoint1 + step.ComponentMultiply({n, i, l});
 				Scalar x = meshAABB.boxPoint1.x + meshSize.x * n / (stride.x - 1);
 				Scalar y = meshAABB.boxPoint1.y + meshSize.y * i / (stride.y - 1);
 				Scalar z = meshAABB.boxPoint1.z + meshSize.z * l / (stride.z - 1);
@@ -220,8 +216,8 @@ int main()
 
 	return 0;
 }
-*/
 
+/*
 int main()
 {
 	SPACE_TYPEDEFS;
@@ -255,7 +251,7 @@ int main()
 	};
 
 	const auto meshSize = meshAABB.Size();
-	auto mesh = mesh2d<Space>(stride, meshAABB, materialParamsGetter);
+	auto mesh = Mesh<Space>(stride, meshAABB, materialParamsGetter);
 
 	std::vector<Scalar> td(stride.GetVolume());
 
@@ -287,3 +283,4 @@ int main()
 	}
 	return 0;
 }
+*/

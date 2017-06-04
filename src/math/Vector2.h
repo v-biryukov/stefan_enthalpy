@@ -112,6 +112,11 @@ struct Vector2
     return Vector2<T>(Abs(x), Abs(y));
   }
 
+  inline T ComponentMax() const
+  {
+	return std::max({ x, y });
+  }
+
   inline const Vector2<T> operator-() const
   {
     return Vector2<T>(-x, -y);

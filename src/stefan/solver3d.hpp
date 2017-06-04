@@ -6,95 +6,40 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
-#include "../math/Spaces.h"
+#include "SolverBase.h"
 
 template <typename Space>
-class mesh3d
+class solver3d : public SolverBase<Space>
 {
-	SPACE_TYPEDEFS;
-
-	IndexVector stride;
-	AABB aabb;
-
-	Scalar hx;
-	Scalar hy;
-	Scalar hz;
-
-	using MaterialParamsGetter = std::function<material_info<Scalar>(const Vector&)>;
-
-	MaterialParamsGetter materialParamsGetter;
-
 public:
-
-	mesh3d() = default;
-
-	mesh3d(const IndexVector& stride, const AABB& aabb,
-		MaterialParamsGetter materialParamsGetter)
-		: stride(stride), aabb(aabb), materialParamsGetter(materialParamsGetter)
-	{
-		auto size = aabb.Size();
-		hx = size.x / (stride.x - 1);
-		hy = size.y / (stride.y - 1);
-		hz = size.z / (stride.z - 1);
-	}
-
-	material_info<Scalar> get_material(int n, int i, int l) const
-	{
-		return materialParamsGetter(aabb.boxPoint1 + Vector(n * hx, i * hy, l * hz));
-	}
-
-	IndexVector getStride() const { return stride; }
-	inline Scalar get_hx() const {return hx;}
-	inline Scalar get_hy() const {return hy;}
-	inline Scalar get_hz() const {return hz;}
-	inline int get_num_x() const {return static_cast<int>(stride.x);}
-	inline int get_num_y() const {return static_cast<int>(stride.y);}
-	inline int get_num_z() const {return static_cast<int>(stride.z);}
-	inline IndexType get_number_of_nodes() const {return stride.GetVolume();}
-};
-
-template <typename Space>
-class solver3d
-{
 	SPACE_TYPEDEFS;
 
-	mesh3d<Space> mesh;
-
-	Scalar * enthalpy_data;
-	Scalar * current_iteration_data;
-	Scalar * next_iteration_data;
-
-	// Auxiliary arrays for tridiagonal method
-	Scalar *a, *b, *c, *f, *x;
-
-	inline IndexType id(IndexType n, IndexType i, IndexType l) { return idx<Space>({n, i, l}, mesh.getStride()); }
-
-	void set_enthalpy_by_T_data(const Scalar * temperature_data)
+	void set_enthalpy_by_T_data(const Scalar* temperature_data)
 	{
-		int num_x = mesh.get_num_x();
-		int num_y = mesh.get_num_y();
-		int num_z = mesh.get_num_z();
+		int num_x = mesh.getStride().x;
+		int num_y = mesh.getStride().y;
+		int num_z = mesh.getStride().z;
 
-		for (int n = 0; n < num_x; ++n)
-			for (int i = 0; i < num_y; ++i)
-				for (int l = 0; l < num_z; ++l)
+		for (size_t n = 0; n < num_x; ++n)
+			for (size_t i = 0; i < num_y; ++i)
+				for (size_t l = 0; l < num_z; ++l)
 				{
-					const auto index = id(n, i, l);
-					enthalpy_data[index] = mesh.get_material(n, i, l).get_enthalpy_by_T(temperature_data[index]);
+					const auto index = id({ n, i, l });
+					enthalpy_data[index] = mesh.get_material({ n, i, l }).get_enthalpy_by_T(temperature_data[index]);
 				}
 	}
 
-	void iterate_tridiagonal(int axis, 
-		const Scalar * enthalpy_data, 
-		const Scalar * current_iteration_data, 
-		Scalar * next_iteration_data, 
-		Scalar dt)
+	void iterate_tridiagonal(int axis,
+		const std::vector<Scalar>& enthalpy_data,
+		const std::vector<Scalar>& current_iteration_data,
+		std::vector<Scalar>& next_iteration_data,
+		Scalar dt) override
 	{
 		int idx1_p, idx1_m;
 		int idx2_p, idx2_m;
 		int idx3_p, idx3_m;
 		int num_1, num_2, num_3;
-		int ix, iy, iz;
+		size_t ix, iy, iz;
 		Scalar h1, h2, h3;
 
 		int idx_c = 0;
@@ -102,34 +47,34 @@ class solver3d
 		{
 			idx1_p = 1;
 			idx1_m = -1;
-			idx2_p = mesh.get_num_x();
-			idx2_m = -mesh.get_num_x();
-			idx3_p = mesh.get_num_x()*mesh.get_num_y();
-			idx3_m = -mesh.get_num_x()*mesh.get_num_y();
-			num_1 = mesh.get_num_x(); num_2 = mesh.get_num_y(); num_3 = mesh.get_num_z();
-			h1 = mesh.get_hx(); h2 = mesh.get_hy(); h3 = mesh.get_hz();
+			idx2_p = mesh.getStride().x;
+			idx2_m = -idx2_p;
+			idx3_p = mesh.getStride().x * mesh.getStride().y;
+			idx3_m = -idx3_p;
+			num_1 = mesh.getStride().x; num_2 = mesh.getStride().y; num_3 = mesh.getStride().z;
+			h1 = mesh.get_h().x; h2 = mesh.get_h().y; h3 = mesh.get_h().z;
 		}
 		else if (axis == 1)
 		{
-			idx1_p = mesh.get_num_x();
-			idx1_m = -mesh.get_num_x();
-			idx2_p = mesh.get_num_x()*mesh.get_num_y();
-			idx2_m = -mesh.get_num_x()*mesh.get_num_y();
+			idx1_p = mesh.getStride().x;
+			idx1_m = -idx1_p;
+			idx2_p = mesh.getStride().x * mesh.getStride().y;
+			idx2_m = -idx2_p;
 			idx3_p = 1;
 			idx3_m = -1;
-			num_1 = mesh.get_num_y(); num_2 = mesh.get_num_z(); num_3 = mesh.get_num_x();
-			h1 =  mesh.get_hy(); h2 = mesh.get_hz();  h3 = mesh.get_hx();
+			num_1 = mesh.getStride().y; num_2 = mesh.getStride().z; num_3 = mesh.getStride().x;
+			h1 =  mesh.get_h().y; h2 = mesh.get_h().z;  h3 = mesh.get_h().x;
 		}
 		else if (axis == 2)
 		{
-			idx1_p = mesh.get_num_x()*mesh.get_num_y();
-			idx1_m = -mesh.get_num_x()*mesh.get_num_y();
+			idx1_p = mesh.getStride().x * mesh.getStride().y;
+			idx1_m = -idx1_p;
 			idx2_p = 1;
 			idx2_m = -1;
-			idx3_p = mesh.get_num_x();
-			idx3_m = -mesh.get_num_x();
-			num_1 = mesh.get_num_z(); num_2 = mesh.get_num_x(); num_3 = mesh.get_num_y();
-			h1 =  mesh.get_hz(); h2 = mesh.get_hx();  h3 = mesh.get_hy();
+			idx3_p = mesh.getStride().x;
+			idx3_m = -idx3_p;
+			num_1 = mesh.getStride().z; num_2 = mesh.getStride().x; num_3 = mesh.getStride().y;
+			h1 =  mesh.get_h().z; h2 = mesh.get_h().x;  h3 = mesh.get_h().y;
 		}
 		else
 		{
@@ -150,39 +95,39 @@ class solver3d
 					if (axis == 0)
 					{
 						ix = i1; iy = i2; iz = i3;
-						mi = mesh.get_material(ix, iy, iz);
-						min1 = mesh.get_material(ix-1, iy, iz);
-						mip1 = mesh.get_material(ix+1, iy, iz);
-						min2 = mesh.get_material(ix, iy-1, iz);
-						mip2 = mesh.get_material(ix, iy+1, iz);
-						min3 = mesh.get_material(ix, iy, iz-1);
-						mip3 = mesh.get_material(ix, iy, iz+1);
+						mi = mesh.get_material({ ix, iy, iz });
+						min1 = mesh.get_material({ ix - 1, iy, iz });
+						mip1 = mesh.get_material({ ix + 1, iy, iz });
+						min2 = mesh.get_material({ ix, iy - 1, iz });
+						mip2 = mesh.get_material({ ix, iy + 1, iz });
+						min3 = mesh.get_material({ ix, iy, iz - 1 });
+						mip3 = mesh.get_material({ ix, iy, iz + 1 });
 					}
 					else if (axis == 1)
 					{
 						ix = i3; iy = i1; iz = i2;
-						mi = mesh.get_material(ix, iy, iz);
-						min1 = mesh.get_material(ix, iy-1, iz);
-						mip1 = mesh.get_material(ix, iy+1, iz);
-						min2 = mesh.get_material(ix, iy, iz-1);
-						mip2 = mesh.get_material(ix, iy, iz+1);
-						min3 = mesh.get_material(ix-1, iy, iz);
-						mip3 = mesh.get_material(ix+1, iy, iz);
+						mi = mesh.get_material({ ix, iy, iz });
+						min1 = mesh.get_material({ ix, iy - 1, iz });
+						mip1 = mesh.get_material({ ix, iy + 1, iz });
+						min2 = mesh.get_material({ ix, iy, iz - 1 });
+						mip2 = mesh.get_material({ ix, iy, iz + 1 });
+						min3 = mesh.get_material({ ix - 1, iy, iz });
+						mip3 = mesh.get_material({ ix + 1, iy, iz });
 					}
 					else
 					{
 						ix = i2; iy = i3; iz = i1;
-						mi = mesh.get_material(ix, iy, iz);
-						min1 = mesh.get_material(ix, iy, iz-1);
-						mip1 = mesh.get_material(ix, iy, iz+1);
-						min2 = mesh.get_material(ix-1, iy, iz);
-						mip2 = mesh.get_material(ix+1, iy, iz);
-						min3 = mesh.get_material(ix, iy-1, iz);
-						mip3 = mesh.get_material(ix, iy+1, iz);
+						mi = mesh.get_material({ ix, iy, iz });
+						min1 = mesh.get_material({ ix, iy, iz - 1 });
+						mip1 = mesh.get_material({ ix, iy, iz + 1 });
+						min2 = mesh.get_material({ ix - 1, iy, iz });
+						mip2 = mesh.get_material({ ix + 1, iy, iz });
+						min3 = mesh.get_material({ ix, iy - 1, iz });
+						mip3 = mesh.get_material({ ix, iy + 1, iz });
 					}
 					
-					const Scalar * E_iter = current_iteration_data + id(ix, iy, iz);
-					const Scalar * E_step = enthalpy_data + id(ix, iy, iz);
+					const Scalar* E_iter = current_iteration_data.data() + id({ ix, iy, iz });
+					const Scalar* E_step = enthalpy_data.data() + id({ ix, iy, iz });
 
 					Scalar kp = (mip1.get_thermal_conductivity_by_E(E_iter[idx1_p]) + mi.get_thermal_conductivity_by_E(E_iter[idx_c])) / 2.0;
 					Scalar km = (mi.get_thermal_conductivity_by_E(E_iter[idx_c]) + min1.get_thermal_conductivity_by_E(E_iter[idx1_m])) / 2.0;
@@ -213,103 +158,12 @@ class solver3d
 		}
 	}
 
-	void solve_tridiagonal (int n, Scalar *a, Scalar *b, Scalar *c, Scalar *f, Scalar *x)
-	{
-		Scalar m;
-		for (int i = 1; i < n; i++)
-		{
-			m = a[i]/b[i-1];
-			b[i] = b[i] - m*c[i-1];
-			f[i] = f[i] - m*f[i-1];
-		}
-
-		x[n-1] = f[n-1]/b[n-1];
-
-		for (int i = n - 2; i >= 0; i--)
-			x[i]=(f[i]-c[i]*x[i+1])/b[i];
-	}
-
-	Scalar calculate_Linf_norm(const Scalar * A, const Scalar * B)
-	{
-		Scalar Linf = 0.0;
-		for (int n = 0; n < mesh.get_num_x(); ++n)
-			for (int i = 0; i < mesh.get_num_y(); ++i)
-				for (int l = 0; l < mesh.get_num_z(); ++l)
-				{
-					Scalar current_norm = fabs(A[id(n, i, l)] - B[id(n, i, l)]);
-					if (current_norm > Linf)
-						Linf = current_norm;
-				}
-		return Linf;
-	}
-
-	Scalar calculate_Linf_norm(const Scalar * A)
-	{
-		Scalar Linf = 0.0;
-		for (int n = 0; n < mesh.get_num_x(); ++n)
-			for (int i = 0; i < mesh.get_num_y(); ++i)
-				for (int l = 0; l < mesh.get_num_z(); ++l)
-				{
-					Scalar current_norm = fabs(A[id(n, i, l)]);
-					if (current_norm > Linf)
-						Linf = current_norm;
-				}
-		return Linf;
-	}
-
-	void assign(Scalar * A, const Scalar * B)
-	{
-		for (int n = 0; n < mesh.get_num_x(); ++n)
-			for (int i = 0; i < mesh.get_num_y(); ++i)
-				for (int l = 0; l < mesh.get_num_z(); ++l)
-				{
-					A[id(n, i, l)] = B[id(n, i, l)];
-				}
-	}
-
-	void step(int axis, Scalar dt)
-	{
-		Scalar norm = 1.0;
-		assign(next_iteration_data, enthalpy_data);
-		while (norm > 1e-3)
-		{
-			assign(current_iteration_data, next_iteration_data);
-			iterate_tridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
-			norm = calculate_Linf_norm(current_iteration_data, next_iteration_data) / calculate_Linf_norm(current_iteration_data);
-		}
-		assign(enthalpy_data, next_iteration_data);
-	}
-
-
+	using SolverBase<Space>::step;
 
 public:
-	solver3d(const mesh3d<Space>& mesh, const Scalar* temperature_data) 
+	solver3d(const Mesh<Space>& mesh, const Scalar* temperature_data) : SolverBase(mesh)
 	{
-		this->mesh = mesh;
-		enthalpy_data = new Scalar[mesh.get_number_of_nodes()];
-		current_iteration_data = new Scalar [mesh.get_number_of_nodes()];
-		next_iteration_data = new Scalar [mesh.get_number_of_nodes()];
 		set_enthalpy_by_T_data(temperature_data);
-
-		int max_n = std::max({ mesh.get_num_x(), mesh.get_num_y(), mesh.get_num_z() });
-		a = new Scalar[max_n];
-		b = new Scalar[max_n];
-		c = new Scalar[max_n];
-		f = new Scalar[max_n];
-		x = new Scalar[max_n];
-	}
-
-	~solver3d()
-	{
-		delete [] enthalpy_data;
-		delete [] current_iteration_data;
-		delete [] next_iteration_data;
-
-		delete [] a;
-		delete [] b;
-		delete [] c;
-		delete [] f;
-		delete [] x;
 	}
 
 	void step(Scalar dt)
@@ -321,51 +175,51 @@ public:
 
 	void save_to_vtk(const std::string& name)
 	{
-		int num_x = mesh.get_num_x();
-		int num_y = mesh.get_num_y();
-		int num_z = mesh.get_num_z();
+		int num_x = mesh.getStride().x;
+		int num_y = mesh.getStride().y;
+		int num_z = mesh.getStride().z;
 
 		std::ofstream vtk_file(name.c_str());
 		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
 		vtk_file << "DATASET STRUCTURED_POINTS\nDIMENSIONS " << num_x << " " << num_y << " " << num_z << "\n";
-		vtk_file << "ORIGIN 0 0 0\n" << "SPACING " << mesh.get_hx() << " " << mesh.get_hy() << " " << mesh.get_hz() << "\n";
+		vtk_file << "ORIGIN 0 0 0\n" << "SPACING " << mesh.get_h().x << " " << mesh.get_h().y << " " << mesh.get_h().z << "\n";
 
-		vtk_file << "\nPOINT_DATA " << num_x * num_y * num_z << "\n";
+		vtk_file << "\nPOINT_DATA " << mesh.get_number_of_nodes() << "\n";
 		vtk_file << "SCALARS E FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
 
-		for (int l = 0; l < num_z; l++)
-			for (int i = 0; i < num_y; i++)
-				for (int n = 0; n < num_x; n++)
+		for (IndexType l = 0; l < num_z; l++)
+			for (IndexType i = 0; i < num_y; i++)
+				for (IndexType n = 0; n < num_x; n++)
 				{
-					vtk_file <<  enthalpy_data[id(n, i, l)] << "\n";
+					vtk_file << enthalpy_data[id({ n, i, l })] << "\n";
 				}
 		vtk_file << "SCALARS T FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int l = 0; l < num_z; l++)
-			for (int i = 0; i < num_y; i++)
-				for (int n = 0; n < num_x; n++)
+		for (IndexType l = 0; l < num_z; l++)
+			for (IndexType i = 0; i < num_y; i++)
+				for (IndexType n = 0; n < num_x; n++)
 				{
-					auto mi = mesh.get_material(n, i, l);
-					vtk_file <<  mi.get_T_by_enthalpy(enthalpy_data[id(n, i, l)]) << "\n";
+					auto mi = mesh.get_material({ n, i, l });
+					vtk_file << mi.get_T_by_enthalpy(enthalpy_data[id({ n, i, l })]) << "\n";
 				}
 		vtk_file << "SCALARS K FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int l = 0; l < num_z; l++)
-			for (int i = 0; i < num_y; i++)
-				for (int n = 0; n < num_x; n++)
+		for (size_t l = 0; l < num_z; l++)
+			for (size_t i = 0; i < num_y; i++)
+				for (size_t n = 0; n < num_x; n++)
 				{
-					auto mi = mesh.get_material(n, i, l);
-					vtk_file <<  mi.get_thermal_conductivity_by_E(enthalpy_data[id(n, i, l)]) << "\n";
+					auto mi = mesh.get_material({ n, i, l });
+					vtk_file << mi.get_thermal_conductivity_by_E(enthalpy_data[id({ n, i, l })]) << "\n";
 				}
 		vtk_file << "SCALARS state FLOAT\n";
 		vtk_file << "LOOKUP_TABLE default\n";
-		for (int l = 0; l < num_z; l++)
-			for (int i = 0; i < num_y; i++)
-				for (int n = 0; n < num_x; n++)
+		for (size_t l = 0; l < num_z; l++)
+			for (size_t i = 0; i < num_y; i++)
+				for (size_t n = 0; n < num_x; n++)
 				{
-					auto mi = mesh.get_material(n, i, l);
-					Scalar T = mi.get_T_by_enthalpy(enthalpy_data[id(n, i, l)]);
+					auto mi = mesh.get_material({ n, i, l });
+					Scalar T = mi.get_T_by_enthalpy(enthalpy_data[id({ n, i, l })]);
 					Scalar state;
 					if (T <= mi.T1)
 						state = 0.0;

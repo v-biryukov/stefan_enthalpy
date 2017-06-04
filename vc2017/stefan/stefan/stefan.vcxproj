@@ -141,9 +141,11 @@
     <ClInclude Include="..\..\..\src\math\VectorMaths.h" />
     <ClInclude Include="..\..\..\src\mesh\MeshIO.h" />
     <ClInclude Include="..\..\..\src\stefan\material_info.hpp" />
+    <ClInclude Include="..\..\..\src\stefan\mesh.h" />
     <ClInclude Include="..\..\..\src\stefan\settings.h" />
     <ClInclude Include="..\..\..\src\stefan\solver2d.hpp" />
     <ClInclude Include="..\..\..\src\stefan\solver3d.hpp" />
+    <ClInclude Include="..\..\..\src\stefan\SolverBase.h" />
     <ClInclude Include="..\..\..\src\utils\Base64.h" />
     <ClInclude Include="..\..\..\src\utils\Utils.h" />
   </ItemGroup>

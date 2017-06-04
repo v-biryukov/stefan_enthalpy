@@ -7,6 +7,14 @@
 #include <sstream>
 #include <algorithm>
 
+template <typename T>
+void adjustValueToRange(T& value, const T& minValue, const T& maxValue)
+{
+	assert(minValue <= maxValue);
+	if (value < minValue) value = minValue;
+	if (value > maxValue) value = maxValue;
+}
+
 bool ReplaceSubstring(std::string& str, const std::string& from, const std::string& to)
 {
   size_t start_pos = str.find(from);
