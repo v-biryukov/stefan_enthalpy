@@ -11,7 +11,7 @@
 #include <array>
 #include <algorithm>
 
-
+#include "../math/Stride.h"
 #include "settings.h"
 #include "material_info.hpp"
 #include "solver2d.hpp"
@@ -147,8 +147,8 @@ int main()
 {
 	SPACE_TYPEDEFS;
 
-	const Space::IndexVector stride = { 61, 61, 61 };
-	Space::AABB meshAABB;
+	const IndexVector stride = { 61, 61, 61 };
+	AABB meshAABB;
 
 	auto materialIndices = loadMesh("./meshes/test", stride, meshAABB);
 
@@ -181,25 +181,23 @@ int main()
 	// set initial temperature
 	std::vector<Scalar> td(stride.GetVolume(), 0); // todo: default value from config 
 					
-	for (IndexType l = 0; l < stride.z; ++l)
-		for (IndexType i = 0; i < stride.y; ++i)
-			for (IndexType n = 0; n < stride.x; ++n)
-			{
-				//const Vector step = meshSize.ComponentDivide(stride - Vector::one());
-				//const Vector point = meshAABB.boxPoint1 + step.ComponentMultiply({n, i, l});
-				Scalar x = meshAABB.boxPoint1.x + meshSize.x * n / (stride.x - 1);
-				Scalar y = meshAABB.boxPoint1.y + meshSize.y * i / (stride.y - 1);
-				Scalar z = meshAABB.boxPoint1.z + meshSize.z * l / (stride.z - 1);
+	for (const auto& node : AllNodes<Space>(stride))
+	{
+		const Vector step = meshSize.ComponentDivide(stride - Vector::one());
+		const Vector point = meshAABB.boxPoint1 + step.ComponentMultiply(node);
+		//Scalar x = meshAABB.boxPoint1.x + meshSize.x * n / (stride.x - 1);
+		//Scalar y = meshAABB.boxPoint1.y + meshSize.y * i / (stride.y - 1);
+		//Scalar z = meshAABB.boxPoint1.z + meshSize.z * l / (stride.z - 1);
 //				if (x > 2 && x < 4 && y > 2 && y < 4 && z > 2 && z < 4)
-				if (materialIndices[idx<Space>({ n, i, l }, stride)] == 0)
-				{
-					td[idx<Space>({n, i, l}, stride)] = 272.0;
-				}
-				else
-				{
-					td[idx<Space>({ n, i, l }, stride)] = 303.0;
-				}
-			}
+		if (materialIndices[idx<Space>(node, stride)] == 0)
+		{
+			td[idx<Space>(node, stride)] = 272.0;
+		}
+		else
+		{
+			td[idx<Space>(node, stride)] = 303.0;
+		}
+	}
 
 	auto sol = solver3d<Space>(mesh, td.data());
 	for (int i = 0; i < 3000; ++i)

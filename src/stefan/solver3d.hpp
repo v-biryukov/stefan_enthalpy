@@ -14,21 +14,6 @@ class solver3d : public SolverBase<Space>
 public:
 	SPACE_TYPEDEFS;
 
-	void set_enthalpy_by_T_data(const Scalar* temperature_data)
-	{
-		int num_x = mesh.getStride().x;
-		int num_y = mesh.getStride().y;
-		int num_z = mesh.getStride().z;
-
-		for (size_t n = 0; n < num_x; ++n)
-			for (size_t i = 0; i < num_y; ++i)
-				for (size_t l = 0; l < num_z; ++l)
-				{
-					const auto index = id({ n, i, l });
-					enthalpy_data[index] = mesh.get_material({ n, i, l }).get_enthalpy_by_T(temperature_data[index]);
-				}
-	}
-
 	void iterate_tridiagonal(int axis,
 		const std::vector<Scalar>& enthalpy_data,
 		const std::vector<Scalar>& current_iteration_data,
@@ -161,17 +146,12 @@ public:
 	using SolverBase<Space>::step;
 
 public:
-	solver3d(const Mesh<Space>& mesh, const Scalar* temperature_data) : SolverBase(mesh)
+	solver3d(const Mesh<Space>& mesh, const Scalar* temperature_data) : 
+		SolverBase(mesh, temperature_data)
 	{
-		set_enthalpy_by_T_data(temperature_data);
 	}
 
-	void step(Scalar dt)
-	{
-		step(0, dt);
-		step(1, dt);
-		step(2, dt);
-	}
+	
 
 	void save_to_vtk(const std::string& name)
 	{

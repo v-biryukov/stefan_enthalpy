@@ -7,11 +7,13 @@ class SolverBase
 {
 	SPACE_TYPEDEFS;
 public:
-	SolverBase(const Mesh<Space>& mesh) : mesh(mesh)
+	SolverBase(const Mesh<Space>& mesh, const Scalar* temperature_data) : mesh(mesh)
 	{
 		enthalpy_data.resize(mesh.get_number_of_nodes());
 		current_iteration_data.resize(mesh.get_number_of_nodes());
 		next_iteration_data.resize(mesh.get_number_of_nodes());
+
+		set_enthalpy_by_T_data(temperature_data);
 
 		const auto max_n = mesh.getStride().ComponentMax();
 		a.resize(max_n);
@@ -21,7 +23,24 @@ public:
 		x.resize(max_n);
 	}
 
+	void step(Scalar dt)
+	{
+		for (int stepIndex = 0; stepIndex < Space::Dimension; ++stepIndex)
+		{
+			step(stepIndex, dt);
+		}
+	}
+
 protected:
+
+	void set_enthalpy_by_T_data(const Scalar* temperature_data)
+	{
+		for (const auto& node : AllNodes<Space>(mesh.getStride()))
+		{
+			const auto index = id(node);
+			enthalpy_data[index] = mesh.get_material(node).get_enthalpy_by_T(temperature_data[index]);
+		}
+	}
 
 	IndexType id(const IndexVector& coord) { return idx<Space>(coord, mesh.getStride()); }
 

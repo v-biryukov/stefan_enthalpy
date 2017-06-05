@@ -135,6 +135,7 @@
     <ClInclude Include="..\..\..\src\math\QuadraturePrecomputer.h" />
     <ClInclude Include="..\..\..\src\math\Random.h" />
     <ClInclude Include="..\..\..\src\math\Spaces.h" />
+    <ClInclude Include="..\..\..\src\math\Stride.h" />
     <ClInclude Include="..\..\..\src\math\Util.h" />
     <ClInclude Include="..\..\..\src\math\Vector2.h" />
     <ClInclude Include="..\..\..\src\math\Vector3.h" />
