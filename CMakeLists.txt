@@ -64,9 +64,9 @@ set(utils
 
 set(sources
   ./src/stefan/stefan.cpp
-  ./src/stefan/material_info.hpp
-  ./src/stefan/solver2d.hpp
-  ./src/stefan/solver3d.hpp
+  ./src/stefan/material_info.h
+  ./src/stefan/mesh.h
+  ./src/stefan/solver.h
 )
 
 add_executable (${BinaryFileName} ${sources} ${math} ${utils})

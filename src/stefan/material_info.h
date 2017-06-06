@@ -1,7 +1,7 @@
 #pragma once
 
 
-struct material_info
+struct MaterialInfo
 {
 	// material melts from T1 to T2; T1~T2
 	double T1;
@@ -16,44 +16,44 @@ struct material_info
 	double specific_heat_capacity_S;
 
 
-	material_info()
+	MaterialInfo()
 	{
 	}
-	material_info(double T1, double T2, double rho_L, double rho_S, double thermal_conductivity_L, double thermal_conductivity_S,
+	MaterialInfo(double T1, double T2, double rho_L, double rho_S, double thermal_conductivity_L, double thermal_conductivity_S,
 		double specific_heat_fusion, double specific_heat_capacity_L, double specific_heat_capacity_S)
 		: T1(T1), T2(T2), rho_L(rho_L), rho_S(rho_S), thermal_conductivity_L(thermal_conductivity_L), thermal_conductivity_S(thermal_conductivity_S),
 		specific_heat_fusion(specific_heat_fusion), specific_heat_capacity_L(specific_heat_capacity_L), specific_heat_capacity_S(specific_heat_capacity_S)
 	{
 	}
 
-	double get_enthalpy_by_T(double T)
+	double GetEnthalpyByT(double T)
 	{
 		double E;
 		if (T < T1)
-			E = get_b() * T;
+			E = GetB() * T;
 		else if (T < T2)
-			E = (T - get_p2()) / get_p1();
+			E = (T - GetP2()) / GetP1();
 		else
-			E = get_r1() * T + get_r2();
+			E = GetR1() * T + GetR2();
 		return E;
 	}
 
-	double get_T_by_enthalpy(double enthalpy)
+	double GetTByEnthalpy(double enthalpy)
 	{
-		double E1 = get_b() * T1;
-		double E2 = get_r1() * T2 + get_r2();
+		double E1 = GetB() * T1;
+		double E2 = GetR1() * T2 + GetR2();
 		if (enthalpy < E1)
-			return enthalpy / get_b();
+			return enthalpy / GetB();
 		else if (enthalpy < E2)
-			return enthalpy * get_p1() + get_p2();
+			return enthalpy * GetP1() + GetP2();
 		else 
-			return (enthalpy - get_r2()) / get_r1();
+			return (enthalpy - GetR2()) / GetR1();
 	}
 
-	double get_thermal_conductivity_by_E(double enthalpy)
+	double GetThermalConductivityByE(double enthalpy)
 	{
-		double E1 = get_b() * T1;
-		double E2 = get_r1() * T2 + get_r2();
+		double E1 = GetB() * T1;
+		double E2 = GetR1() * T2 + GetR2();
 		if (enthalpy < E1)
 			return thermal_conductivity_S;
 		else if (enthalpy < E2)
@@ -62,53 +62,53 @@ struct material_info
 			return thermal_conductivity_L;
 	}
 
-	double get_alpha(double enthalpy)
+	double GetAlpha(double enthalpy)
 	{
-		double E1 = get_b() * T1;
-		double E2 = get_r1() * T2 + get_r2();
+		double E1 = GetB() * T1;
+		double E2 = GetR1() * T2 + GetR2();
 		if (enthalpy < E1)
-			return 1.0 / get_b();
+			return 1.0 / GetB();
 		else if (enthalpy < E2)
-			return get_p1();
+			return GetP1();
 		else
-			return 1.0 / get_r1();
+			return 1.0 / GetR1();
 	}
 
 
-	double get_beta(double enthalpy)
+	double GetBeta(double enthalpy)
 	{
-		double E1 = get_b() * T1;
-		double E2 = get_r1() * T2 + get_r2();
+		double E1 = GetB() * T1;
+		double E2 = GetR1() * T2 + GetR2();
 		if (enthalpy < E1)
 			return 0.0;
 		else if (enthalpy < E2)
-			return get_p2();
+			return GetP2();
 		else
-			return -get_r2() / get_r1();
+			return -GetR2() / GetR1();
 	}
 
 private:
-	double get_b()
+	double GetB()
 	{
 		return rho_S * specific_heat_capacity_S;
 	}
 
-	double get_p1()
+	double GetP1()
 	{
 		return (T2-T1)/(rho_S*specific_heat_fusion);
 	}
 
-	double get_p2()
+	double GetP2()
 	{
 		return T1*(1.0 - specific_heat_capacity_S*(T2-T1)/specific_heat_fusion);
 	}
 
-	double get_r1()
+	double GetR1()
 	{
 		return rho_L * specific_heat_capacity_L;
 	}
 
-	double get_r2()
+	double GetR2()
 	{
 		return rho_S * specific_heat_fusion + rho_S * specific_heat_capacity_S * T1 - rho_L * specific_heat_capacity_L * T2;
 	}
