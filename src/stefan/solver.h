@@ -16,9 +16,11 @@ class Solver
 	std::vector<double> current_iteration_data;
 	std::vector<double> next_iteration_data;
 
-
 	// Auxiliary vectors for tridiagonal method
 	std::vector<double> a, b, c, f, x;
+
+	// Boundary conditions
+	std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
 
 	void SetEnthalpyByTData(const std::vector<double> & temperature_data)
 	{
@@ -86,6 +88,30 @@ class Solver
 			Linf_norm = CalculateLinfNorm(current_iteration_data, next_iteration_data) / CalculateLinfNorm(current_iteration_data);
 		}
 		Assign(enthalpy_data, next_iteration_data);
+	}
+
+
+	void SetBoundaryConditions(int axis, std::array<int, Dims> index,
+		std::vector<double> & a, std::vector<double> & b, 
+		std::vector<double> & c, std::vector<double> & f)
+	{
+		int num = mesh.GetNums()[axis];
+		double h = mesh.GetSteps()[axis];
+		std::rotate(index.begin(), index.begin() + axis, index.end());
+		index[axis] = 0;
+		double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+		double beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
+		a[0] = 0.0; 
+		b[0] = alpha*(boundary_conditions[2*axis][0] - boundary_conditions[2*axis][1]/h); 
+		c[0] = boundary_conditions[2*axis][1] * alpha / h; 
+		f[0] = boundary_conditions[2*axis][2] - boundary_conditions[2*axis][0] * beta;
+		index[axis] = num-1;
+		alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+		beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
+		a[num-1] = -boundary_conditions[2*axis+1][1] * alpha / h; 
+		b[num-1] = alpha*(boundary_conditions[2*axis+1][0] + boundary_conditions[2*axis+1][1]/h); 
+		c[num-1] = 0.0; 
+		f[num-1] = boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta;
 	}
 
 
@@ -220,8 +246,15 @@ void Solver<2>::IterateTridiagonal(int axis,
 	
 	for (int i2 = 1; i2 < num_2-1; ++i2)
 	{
+		/*
 		a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 		a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
+		*/
+
+		// Setting boundary conditions
+		SetBoundaryConditions(axis, {0, i2}, a, b, c, f);
+		
+
 
 		for (int i1 = 1; i1 < num_1-1; ++i1)
 		{
@@ -244,8 +277,8 @@ void Solver<2>::IterateTridiagonal(int axis,
 				mip2 = mesh.GetMaterialInfo({ix+1, iy});
 			}
 			
-			const double * E_iter = current_iteration_data.data() + ix + iy*mesh.GetNums()[0];
-			const double * E_step = enthalpy_data.data() + ix + iy*mesh.GetNums()[0];
+			const double * E_iter = current_iteration_data.data() + mesh.GetGlobalId({ix, iy});
+			const double * E_step = enthalpy_data.data() + mesh.GetGlobalId({ix, iy});
 
 			double kp = (mip1.GetThermalConductivityByE(E_iter[idx1_p]) + mi.GetThermalConductivityByE(E_iter[idx1_c])) / 2.0;
 			double km = (mi.GetThermalConductivityByE(E_iter[idx1_c]) + min1.GetThermalConductivityByE(E_iter[idx1_m])) / 2.0;
@@ -325,8 +358,16 @@ void Solver<3>::IterateTridiagonal(int axis,
 	{
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
+			/*
 			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 			a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
+			*/
+
+			// Setting boundary conditions
+			for (int i = 0; i < 6; ++i)
+				boundary_conditions[i] = {1, 0, 900};
+
+			SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
 
 
 			for (int i1 = 1; i1 < num_1-1; ++i1)

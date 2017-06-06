@@ -50,9 +50,9 @@ int main()
 			}
 
 	Solver<3> sol = Solver<3>(mesh, td);
-	for (int i = 0; i < 30; ++i)
+	for (int i = 0; i < 3000; ++i)
 	{
-        if (i%10 == 0)
+        if (i%100 == 0)
 		{
 			std::stringstream ss;
 			ss << i;
