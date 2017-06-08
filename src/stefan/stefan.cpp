@@ -21,7 +21,7 @@ void PrintHelpInfo()
 
 template <int Dims>
 void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums, 
-	std::array<double, Dims> lengths, std::vector<int> & material_indexes)
+    std::array<double, Dims> & lengths, std::vector<int> & material_indexes)
 {
 	std::ifstream file (file_name, std::ios::in|std::ios::binary|std::ios::ate);
 	if (file.is_open())
@@ -31,8 +31,8 @@ void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums,
 		file.seekg (0, std::ios::beg);
 		file.read ((char*)nums.data(), Dims * sizeof(int));
 		file.read ((char*)lengths.data(), Dims * sizeof(double));
-		int num_of_nodes = nums[0]*nums[1]*nums[2];
-		material_indexes.reserve(num_of_nodes);
+        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+        material_indexes.resize(num_of_nodes);
 		file.read ((char*)material_indexes.data(), num_of_nodes * sizeof(int));
 		file.close();
 	}
@@ -52,14 +52,14 @@ void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std
 		std::streampos size;
 		size = file.tellg();
 		file.seekg (0, std::ios::beg);
-		int num_of_nodes = nums[0]*nums[1]*nums[2];
+        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
 		initial_temperatures.reserve(num_of_nodes);
 		file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
 		file.close();
 	}
 	else 
 	{
-		std::cerr << "Error: Unable to open mesh file \n";
+        std::cerr << "Error: Unable to open initial temperatures file \n";
 		std::exit(EXIT_FAILURE);
 	}
 }
@@ -83,8 +83,20 @@ int Run(const Settings & settings)
 	Mesh<Dims> mesh = Mesh<Dims>(nums, lengths, material_infos, material_indexes);
 
 	std::vector<double> initial_temperatures;
-	ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
-	Solver<Dims> sol = Solver<Dims>(mesh, initial_temperatures);
+    if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
+    {
+        ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
+    }
+    else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
+    {
+        for (auto el : material_indexes)
+            initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[el]);
+    }
+
+    std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
+    for (int i = 0; i < boundary_conditions.size(); ++i)
+        boundary_conditions[i] = settings.mesh_settings.boundary_settings_info[i].params;
+    Solver<Dims> sol = Solver<Dims>(mesh, boundary_conditions, initial_temperatures);
 	for (int time_step_num = 0; time_step_num < settings.task_settings.number_of_steps; ++time_step_num)
 	{
         if (time_step_num % settings.snapshot_settings_info.period_frames == 0)

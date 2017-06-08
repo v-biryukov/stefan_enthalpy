@@ -124,15 +124,16 @@ class Solver
 
 public:
 
-	Solver(Mesh<Dims> & mesh, const std::vector<double> & temperature_data) : mesh(mesh)
+    Solver(Mesh<Dims> & mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double> & temperature_data)
+        : mesh(mesh), boundary_conditions(boundary_conditions)
 	{
 		enthalpy_data.resize(mesh.GetNumberOfNodes());
 		current_iteration_data.resize(mesh.GetNumberOfNodes());
 		next_iteration_data.resize(mesh.GetNumberOfNodes());
 
 		SetEnthalpyByTData(temperature_data);
-
-		auto max_n = *std::max_element(mesh.GetNums().begin(), mesh.GetNums().end());
+        auto nums = mesh.GetNums();
+        auto max_n = *std::max_element(nums.begin(), nums.end());
 		a.resize(max_n);
 		b.resize(max_n);
 		c.resize(max_n);
@@ -362,9 +363,6 @@ void Solver<3>::IterateTridiagonal(int axis,
 			*/
 
 			// Setting boundary conditions
-			for (int i = 0; i < 6; ++i)
-				boundary_conditions[i] = {1, 0, 900};
-
 			SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
 
 
