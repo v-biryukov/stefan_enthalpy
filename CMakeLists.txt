@@ -69,6 +69,15 @@ set(sources
   ./src/stefan/solver.h
 )
 
-add_executable (${BinaryFileName} ${sources} ${math} ${utils})
+set(TinyXmlSrc
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinystr.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinyxml.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinyxmlerror.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinyxmlparser.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinystr.h
+  ${CMAKE_SOURCE_DIR}/3rdparty/tinyxml/tinyxml.h
+)
+
+add_executable (${BinaryFileName} ${sources} ${math} ${utils} ${TinyXmlSrc})
 target_link_libraries (${BinaryFileName})
 

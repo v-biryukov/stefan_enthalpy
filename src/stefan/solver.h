@@ -254,8 +254,6 @@ void Solver<2>::IterateTridiagonal(int axis,
 		// Setting boundary conditions
 		SetBoundaryConditions(axis, {0, i2}, a, b, c, f);
 		
-
-
 		for (int i1 = 1; i1 < num_1-1; ++i1)
 		{
 			if (axis == 0)

@@ -5,71 +5,132 @@
 
 #include <math.h>
 #include <vector>
-#include <functional>
+#include <string>
 
 #include "material_info.h"
 #include "solver.h"
+#include "settings_parser.h"
 
 
 
-
-
-int main()
+void PrintHelpInfo()
 {
-    int num_x = 31;
-    int num_y = 31;
-    int num_z = 31;
-	double Lx = 6.0;
-	double Ly = 6.0;
-	double Lz = 6.0;
+	std::cout << "Help info" << std::endl;
+}
 
-	std::vector<MaterialInfo> mis;
-	mis.push_back(MaterialInfo(267, 267, 1000.0, 920.0, 0.591, 2.22, 334000.0, 4200.0, 1100.0));
-	
 
-	std::vector<int> mat_idx(num_x*num_y*num_z, 0);
-
-	Mesh<3> mesh = Mesh<3>({num_x, num_y, num_z}, {Lx, Ly, Lz}, mis, mat_idx);
-
-	std::vector<double> td(num_x*num_y*num_z);
-	for (int n = 0; n < num_x; ++n)
-		for (int i = 0; i < num_y; ++i)
-			for (int l = 0; l < num_y; ++l)
-			{
-				double x = n*Lx/(num_x-1);
-				double y = i*Ly/(num_y-1);
-				double z = l*Lz/(num_z-1);
-				if (x > 2 && x < 4 && y > 2 && y < 4 && z > 2 && z < 4)
-				{
-					td[n + i*num_x + l*num_x*num_y] = 272.0;
-				}
-				else
-				{
-					td[n + i*num_x + l*num_x*num_y] = 303.0;
-				}
-			}
-
-	Solver<3> sol = Solver<3>(mesh, td);
-	for (int i = 0; i < 3000; ++i)
+template <int Dims>
+void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums, 
+	std::array<double, Dims> lengths, std::vector<int> & material_indexes)
+{
+	std::ifstream file (file_name, std::ios::in|std::ios::binary|std::ios::ate);
+	if (file.is_open())
 	{
-        if (i%100 == 0)
+		std::streampos size;
+		size = file.tellg();
+		file.seekg (0, std::ios::beg);
+		file.read ((char*)nums.data(), Dims * sizeof(int));
+		file.read ((char*)lengths.data(), Dims * sizeof(double));
+		int num_of_nodes = nums[0]*nums[1]*nums[2];
+		material_indexes.reserve(num_of_nodes);
+		file.read ((char*)material_indexes.data(), num_of_nodes * sizeof(int));
+		file.close();
+	}
+	else 
+	{
+		std::cerr << "Error: Unable to open mesh file \n";
+		std::exit(EXIT_FAILURE);
+	}
+}
+
+template <int Dims>
+void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std::vector<double> & initial_temperatures)
+{
+	std::ifstream file (file_name, std::ios::in|std::ios::binary|std::ios::ate);
+	if (file.is_open())
+	{
+		std::streampos size;
+		size = file.tellg();
+		file.seekg (0, std::ios::beg);
+		int num_of_nodes = nums[0]*nums[1]*nums[2];
+		initial_temperatures.reserve(num_of_nodes);
+		file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
+		file.close();
+	}
+	else 
+	{
+		std::cerr << "Error: Unable to open mesh file \n";
+		std::exit(EXIT_FAILURE);
+	}
+}
+
+template <int Dims>
+int Run(const Settings & settings)
+{
+	std::array<int, Dims> nums;
+	std::array<double, Dims> lengths;
+	std::vector<int> material_indexes;
+	ReadMeshFile<Dims>(settings.mesh_settings.mesh_file, nums, lengths, material_indexes);
+
+	std::vector<MaterialInfo> material_infos;
+	for (auto mi : settings.mesh_settings.medium_params_info)
+	{
+		material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S, 
+			mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
+			mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
+	}
+
+	Mesh<Dims> mesh = Mesh<Dims>(nums, lengths, material_infos, material_indexes);
+
+	std::vector<double> initial_temperatures;
+	ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
+	Solver<Dims> sol = Solver<Dims>(mesh, initial_temperatures);
+	for (int time_step_num = 0; time_step_num < settings.task_settings.number_of_steps; ++time_step_num)
+	{
+        if (time_step_num % settings.snapshot_settings_info.period_frames == 0)
 		{
 			std::stringstream ss;
-			ss << i;
-			std::cout << "step: " << i << std::endl;
+			ss << time_step_num;
+			std::cout << "step: " << time_step_num << std::endl;
 			sol.SaveToVtk("out/result_" + ss.str() + ".vtk");
 		}
 
-        sol.Step(1000);
+        sol.Step(settings.task_settings.time_step);
 	}
-
 	return 0;
 }
 
 
+int main(int argc, char ** argv)
+{
+	if (argc != 2)
+	{
+		PrintHelpInfo();
+		std::exit(EXIT_FAILURE);
+	}
+    else if (!std::string(argv[1]).compare("-h") || !std::string(argv[1]).compare("--help"))
+	{
+		PrintHelpInfo();
+		std::exit(EXIT_SUCCESS);
+	}
+	else
+	{
+		Settings settings = ParseFile(std::string(argv[1]));
+		if (settings.dims_count == 2)
+		{
+			Run<2>(settings);
+		}
+		else if (settings.dims_count == 3)
+		{
+			Run<3>(settings);
+		}
+	}
+	return 0;
+}
 
 
 /*
+
 int main()
 {
 	int num_x = 241;
@@ -136,4 +197,17 @@ int main()
 	delete [] td;
 	return 0;
 }
-*/
+
+	/*
+	std::ifstream file(file_name, std::ios::binary);
+	for (int i = 0; i < Dims; ++i)
+		file >> nums[i];
+	for (int i = 0; i < Dims; ++i)
+		file >> lengths[i];
+
+	mat_idx.reserve(fileSize);
+	
+	std::copy(std::istream_iterator<int>(file),
+		std::istream_iterator<int>(),
+		std::back_inserter(mat_idx));
+	*/

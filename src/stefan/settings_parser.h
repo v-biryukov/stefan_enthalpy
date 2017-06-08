@@ -125,7 +125,7 @@ Settings ParseFile(std::string xml_file_path)
 
 	if (!xml_doc.LoadFile(xml_file_path.c_str()))
 	{
-		std::cerr << "Loading " << xml_file_path << " fails with following error: " <<
+		std::cerr << "Error: Loading " << xml_file_path << " fails with following error: " <<
 			std::string(xml_doc.ErrorDesc()) << " in row " << xml_doc.ErrorRow() << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
@@ -133,13 +133,14 @@ Settings ParseFile(std::string xml_file_path)
 	TiXmlElement* xml_element = xml_doc.FirstChildElement("Settings");
 	if (!xml_element)
 	{
-		std::cerr << "There is no Settings element \n";
+		std::cerr << "Error: There is no Settings element \n";
 		std::exit(EXIT_FAILURE);
 	}
 
 	if(xml_element->QueryIntAttribute("dimsCount", &settings.dims_count) != TIXML_SUCCESS)
 	{
-		settings.dims_count = 2;
+		std::cerr << "Error: There is no dimsCount element \n";
+		std::exit(EXIT_FAILURE);
 	}
 
 	TiXmlElement* mesh_info_element = xml_element->FirstChildElement("Mesh");
@@ -148,7 +149,7 @@ Settings ParseFile(std::string xml_file_path)
 		ParseMeshInfo(mesh_info_element, settings);
 	} else
 	{
-		std::cerr << "Error: There is no Mesh section \n";
+		std::cerr << "Error: Error: There is no Mesh section \n";
 		std::exit(EXIT_FAILURE);
 	}
 
@@ -162,6 +163,17 @@ Settings ParseFile(std::string xml_file_path)
 		std::exit(EXIT_FAILURE);
 	}
 
+
+        TiXmlElement* task_info_element = xml_element->FirstChildElement("Task");
+        if (task_info_element)
+        {
+                ParseTaskInfo(task_info_element, settings);
+        } else
+        {
+                std::cerr << "Error: There is no Task section \n";
+                std::exit(EXIT_FAILURE);
+        }
+        return settings;
 
 }
 
@@ -237,7 +249,11 @@ void ParseSnapshotInfo(TiXmlElement *snapshot_info_element, Settings & settings)
 
 void ParseTaskInfo(TiXmlElement *task_info_element, Settings & settings)
 {
+        ParseScalar(task_info_element, "timeStep", &(settings.task_settings.time_step));
+        ParseUnsigned(task_info_element, "numberOfSteps", &(settings.task_settings.number_of_steps));
 	TiXmlElement * ini_state_element = task_info_element->FirstChildElement("IniState");
+
+
 
 	TiXmlElement * ini_state_per_node_element = ini_state_element->FirstChildElement("PerNode");
 	TiXmlElement * ini_state_per_submesh_element = ini_state_element->FirstChildElement("PerSubmesh");
