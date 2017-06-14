@@ -139,7 +139,8 @@ class Solver
 		std::vector<double>& next_iteration_data,
 		double dt);
 
-	static int omp_thread_count() {
+	static int omp_thread_count()
+	{
 		int n = 0;
 		#pragma omp parallel reduction(+:n)
 		n += 1;
@@ -241,102 +242,115 @@ public:
 
 
 template<>
-void Solver<2>::IterateTridiagonal(int axis, 
+void Solver<2>::IterateTridiagonal(int axis,
 	const std::vector<double>& enthalpy_data,
 	const std::vector<double>& current_iteration_data,
 	std::vector<double>& next_iteration_data,
 	double dt)
 {
-	int idx1_p, idx1_c, idx1_m;
-	int idx2_p, idx2_c, idx2_m;
-	int num_1, num_2;
-	int ix, iy;
-	double h1, h2;
+	#pragma omp parallel
+	{
+		int idx1_p, idx1_c, idx1_m;
+		int idx2_p, idx2_c, idx2_m;
+		int num_1, num_2;
+		int ix, iy;
+		double h1, h2;
 
-	if (axis == 0)
-	{
-		idx1_p = 1;
-		idx1_c = 0;
-		idx1_m = -1;
-		idx2_p = mesh.GetNums()[0];
-		idx2_c = 0;
-		idx2_m = -mesh.GetNums()[0];
-		num_1 = mesh.GetNums()[0]; num_2 = mesh.GetNums()[1];
-		h1 = mesh.GetSteps()[0]; h2 = mesh.GetSteps()[1];
-	}
-	else if (axis == 1)
-	{
-		idx1_p = mesh.GetNums()[0];
-		idx1_c = 0;
-		idx1_m = -mesh.GetNums()[0];
-		idx2_p = 1;
-		idx2_c = 0;
-		idx2_m = -1;
-		num_1 = mesh.GetNums()[1]; num_2 = mesh.GetNums()[0];
-		h1 =  mesh.GetSteps()[1]; h2 = mesh.GetSteps()[0];
-	}
+		if (axis == 0)
+		{
+			idx1_p = 1;
+			idx1_c = 0;
+			idx1_m = -1;
+			idx2_p = mesh.GetNums()[0];
+			idx2_c = 0;
+			idx2_m = -mesh.GetNums()[0];
+			num_1 = mesh.GetNums()[0]; num_2 = mesh.GetNums()[1];
+			h1 = mesh.GetSteps()[0]; h2 = mesh.GetSteps()[1];
+		}
+		else if (axis == 1)
+		{
+			idx1_p = mesh.GetNums()[0];
+			idx1_c = 0;
+			idx1_m = -mesh.GetNums()[0];
+			idx2_p = 1;
+			idx2_c = 0;
+			idx2_m = -1;
+			num_1 = mesh.GetNums()[1]; num_2 = mesh.GetNums()[0];
+			h1 =  mesh.GetSteps()[1]; h2 = mesh.GetSteps()[0];
+		}
 
-	MaterialInfo mi, min1, mip1, min2, mip2;
-	//std::cout << axis << " " << omp_thread_count() << " " << omp_get_num_threads() << std::endl;
-	#pragma omp parallel for
-	for (int i2 = 1; i2 < num_2-1; ++i2)
-	{
+
+		auto nums = mesh.GetNums();
+		auto max_n = *std::max_element(nums.begin(), nums.end());
+		std::vector<double> a(max_n);
+		std::vector<double> b(max_n);
+		std::vector<double> c(max_n);
+		std::vector<double> f(max_n);
+		std::vector<double> x(max_n);
+
+		/*
 		int tid = omp_get_thread_num();
 		std::vector<double> & a = tridiagonal_data[tid].a;
 		std::vector<double> & b = tridiagonal_data[tid].b;
 		std::vector<double> & c = tridiagonal_data[tid].c;
 		std::vector<double> & f = tridiagonal_data[tid].f;
 		std::vector<double> & x = tridiagonal_solution[tid];
-		/*
-		a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
-		a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
 		*/
-		// Setting boundary conditions
-		SetBoundaryConditions(axis, {0, i2}, a, b, c, f);
 
-		for (int i1 = 1; i1 < num_1-1; ++i1)
+		MaterialInfo mi, min1, mip1, min2, mip2;
+		#pragma omp for
+		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
-			if (axis == 0)
+
+			// Setting boundary conditions
+			SetBoundaryConditions(axis, {0, i2}, a, b, c, f);
+
+			for (int i1 = 1; i1 < num_1-1; ++i1)
 			{
-				ix = i1; iy = i2;
-				mi = mesh.GetMaterialInfo({ix, iy});
-				min1 = mesh.GetMaterialInfo({ix-1, iy});
-				mip1 = mesh.GetMaterialInfo({ix+1, iy});
-				min2 = mesh.GetMaterialInfo({ix, iy-1});
-				mip2 = mesh.GetMaterialInfo({ix, iy+1});
+				if (axis == 0)
+				{
+					ix = i1; iy = i2;
+					mi = mesh.GetMaterialInfo({ix, iy});
+					min1 = mesh.GetMaterialInfo({ix-1, iy});
+					mip1 = mesh.GetMaterialInfo({ix+1, iy});
+					min2 = mesh.GetMaterialInfo({ix, iy-1});
+					mip2 = mesh.GetMaterialInfo({ix, iy+1});
+				}
+				else
+				{
+					ix = i2; iy = i1;
+					mi = mesh.GetMaterialInfo({ix, iy});
+					min1 = mesh.GetMaterialInfo({ix, iy-1});
+					mip1 = mesh.GetMaterialInfo({ix, iy+1});
+					min2 = mesh.GetMaterialInfo({ix-1, iy});
+					mip2 = mesh.GetMaterialInfo({ix+1, iy});
+				}
+
+				const double * E_iter = current_iteration_data.data() + mesh.GetGlobalId({ix, iy});
+				const double * E_step = enthalpy_data.data() + mesh.GetGlobalId({ix, iy});
+
+				double kp = (mip1.GetThermalConductivityByE(E_iter[idx1_p]) + mi.GetThermalConductivityByE(E_iter[idx1_c])) / 2.0;
+				double km = (mi.GetThermalConductivityByE(E_iter[idx1_c]) + min1.GetThermalConductivityByE(E_iter[idx1_m])) / 2.0;
+
+				double coef = dt / (2.0 * h1 * h1);
+				a[i1] = -coef * min1.GetAlpha(E_iter[idx1_m]) * km;
+				b[i1] = 1.0 + coef * mi.GetAlpha(E_iter[idx1_c]) * (km + kp);
+				c[i1] = -coef * mip1.GetAlpha(E_iter[idx1_p]) * kp;
+				f[i1] = E_step[idx1_c] + coef * (min1.GetBeta(E_iter[idx1_m])*km - mi.GetBeta(E_iter[idx1_c])*(km+kp) + mip1.GetBeta(E_iter[idx1_p])*kp);
+
+				double k2p = (mip2.GetThermalConductivityByE(E_step[idx2_p]) + mi.GetThermalConductivityByE(E_step[idx2_c])) / 2.0;
+				double k2n = (min2.GetThermalConductivityByE(E_step[idx2_m]) + mi.GetThermalConductivityByE(E_step[idx2_c])) / 2.0;
+				double T2p = mip2.GetTByEnthalpy(E_step[idx2_p]) - mi.GetTByEnthalpy(E_step[idx2_c]);
+				double T2n = min2.GetTByEnthalpy(E_step[idx2_m]) - mi.GetTByEnthalpy(E_step[idx2_c]);
+				f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
 			}
-			else
-			{
-				ix = i2; iy = i1;
-				mi = mesh.GetMaterialInfo({ix, iy});
-				min1 = mesh.GetMaterialInfo({ix, iy-1});
-				mip1 = mesh.GetMaterialInfo({ix, iy+1});
-				min2 = mesh.GetMaterialInfo({ix-1, iy});
-				mip2 = mesh.GetMaterialInfo({ix+1, iy});
-			}
-			
-			const double * E_iter = current_iteration_data.data() + mesh.GetGlobalId({ix, iy});
-			const double * E_step = enthalpy_data.data() + mesh.GetGlobalId({ix, iy});
 
-			double kp = (mip1.GetThermalConductivityByE(E_iter[idx1_p]) + mi.GetThermalConductivityByE(E_iter[idx1_c])) / 2.0;
-			double km = (mi.GetThermalConductivityByE(E_iter[idx1_c]) + min1.GetThermalConductivityByE(E_iter[idx1_m])) / 2.0;
+			SolveTridiagonal(num_1, a, b, c, f, x);
 
-			double coef = dt / (2.0 * h1 * h1);
-			a[i1] = -coef * min1.GetAlpha(E_iter[idx1_m]) * km;
-			b[i1] = 1.0 + coef * mi.GetAlpha(E_iter[idx1_c]) * (km + kp);
-			c[i1] = -coef * mip1.GetAlpha(E_iter[idx1_p]) * kp;
-			f[i1] = E_step[idx1_c] + coef * (min1.GetBeta(E_iter[idx1_m])*km - mi.GetBeta(E_iter[idx1_c])*(km+kp) + mip1.GetBeta(E_iter[idx1_p])*kp);
-
-			double k2p = (mip2.GetThermalConductivityByE(E_step[idx2_p]) + mi.GetThermalConductivityByE(E_step[idx2_c])) / 2.0;
-			double k2n = (min2.GetThermalConductivityByE(E_step[idx2_m]) + mi.GetThermalConductivityByE(E_step[idx2_c])) / 2.0;
-			double T2p = mip2.GetTByEnthalpy(E_step[idx2_p]) - mi.GetTByEnthalpy(E_step[idx2_c]);
-			double T2n = min2.GetTByEnthalpy(E_step[idx2_m]) - mi.GetTByEnthalpy(E_step[idx2_c]);
-			f[i1] += k2p * T2p * dt/(2*h2*h2) + k2n * T2n * dt/(2*h2*h2);
-		}
-
-		SolveTridiagonal(num_1, a, b, c, f, x);
-		for (int k = 0; k < num_1; ++k)
+			#pragma omp critical
+			for (int k = 0; k < num_1; ++k)
 				next_iteration_data[idx1_p * k + idx2_p * i2] = x[k];
+		}
 	}
 }
 
