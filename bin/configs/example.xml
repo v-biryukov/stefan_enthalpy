@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Settings dimsCount = "2">
-	<Mesh meshFile="meshes/zeroes2d.mesh">
+	<Mesh meshFile="meshes/box2d_512.mesh">
 		<MediumParams>
 			<Submesh index="0" TPhase = "273.0" rhoL = "1000.0" rhoS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
@@ -26,7 +26,7 @@
 		<Data fileName = "out/snapshot<step>.vtk" stride="1 1" writeTemperature="true" writePhase="true"/>
 	</Snapshot>
 
-	<Task numberOfSteps = "1000" timeStep = "3000">
+	<Task numberOfSteps = "300" timeStep = "3000">
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>

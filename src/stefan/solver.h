@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <omp.h>
 
 #include "mesh.h"
 #include "material_info.h"
@@ -17,11 +18,17 @@ class Solver
 	std::vector<double> next_iteration_data;
 
 	// Auxiliary vectors for tridiagonal method
-	std::vector<double> a, b, c, f, x;
+	struct TridiagonalSystem
+	{
+		std::vector<double> a, b, c, f;
+	};
+
+	std::vector<TridiagonalSystem> tridiagonal_data;
+	std::vector<std::vector<double>> tridiagonal_solution;
 
 	// Boundary conditions
     std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
-    const double boundary_condition_eps = 1e-15;
+	const double boundary_condition_eps = 1e-15;
 
     void SetEnthalpyByTData(const std::vector<double>& temperature_data)
 	{
@@ -45,9 +52,9 @@ class Solver
 		x[n-1] = f[n-1]/b[n-1];
 
 		for (int i = n - 2; i >= 0; i--)
-        {
+		{
 			x[i]=(f[i]-c[i]*x[i+1])/b[i];
-        }
+		}
 	}
 
     static double CalculateLinfNorm(const std::vector<double>& a, const std::vector<double>& b)
@@ -105,25 +112,25 @@ class Solver
 		index[axis] = 0;
 
         double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
-        if (fabs(alpha) < boundary_condition_eps)
-            alpha = boundary_condition_eps;
+		if (fabs(alpha) < boundary_condition_eps)
+			alpha = boundary_condition_eps;
 		double beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
 
-        a[0] = 0.0;
-        b[0] = alpha*(boundary_conditions[2*axis][0] - boundary_conditions[2*axis][1]/h);
-        c[0] = boundary_conditions[2*axis][1] * alpha / h ;
-        f[0] = (boundary_conditions[2*axis][2] - boundary_conditions[2*axis][0] * beta);
+		a[0] = 0.0;
+		b[0] = alpha*(boundary_conditions[2*axis][0] - boundary_conditions[2*axis][1]/h);
+		c[0] = boundary_conditions[2*axis][1] * alpha / h ;
+		f[0] = (boundary_conditions[2*axis][2] - boundary_conditions[2*axis][0] * beta);
 
 		index[axis] = num-1;
 		alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
-        if (fabs(alpha) < boundary_condition_eps)
-            alpha = boundary_condition_eps;
+		if (fabs(alpha) < boundary_condition_eps)
+			alpha = boundary_condition_eps;
 		beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
-        a[num-1] = -boundary_conditions[2*axis+1][1] * alpha / h ;
-        b[num-1] = alpha*(boundary_conditions[2*axis+1][0] + boundary_conditions[2*axis+1][1]/h);
+		a[num-1] = -boundary_conditions[2*axis+1][1] * alpha / h ;
+		b[num-1] = alpha*(boundary_conditions[2*axis+1][0] + boundary_conditions[2*axis+1][1]/h);
 		c[num-1] = 0.0; 
-        f[num-1] = (boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta);
-    }
+		f[num-1] = (boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta);
+	}
 
 
 	void IterateTridiagonal(int axis, 
@@ -134,6 +141,13 @@ class Solver
 
 
 public:
+	int omp_thread_count() {
+		int n = 0;
+		#pragma omp parallel reduction(+:n)
+		n += 1;
+		return n;
+	}
+
 
     Solver(Mesh<Dims> & mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double> & temperature_data)
         : mesh(mesh), boundary_conditions(boundary_conditions)
@@ -145,11 +159,18 @@ public:
 		SetEnthalpyByTData(temperature_data);
         auto nums = mesh.GetNums();
         auto max_n = *std::max_element(nums.begin(), nums.end());
-		a.resize(max_n);
-		b.resize(max_n);
-		c.resize(max_n);
-		f.resize(max_n);
-		x.resize(max_n);
+
+		int num_of_threads = omp_thread_count();
+		tridiagonal_data.resize(num_of_threads);
+		tridiagonal_solution.resize(num_of_threads);
+		for (int i = 0; i < num_of_threads; ++i)
+		{
+			tridiagonal_data[i].a.resize(max_n);
+			tridiagonal_data[i].b.resize(max_n);
+			tridiagonal_data[i].c.resize(max_n);
+			tridiagonal_data[i].f.resize(max_n);
+			tridiagonal_solution[i].resize(max_n);
+		}
 	}
 
 	void Step(double dt)
@@ -255,17 +276,23 @@ void Solver<2>::IterateTridiagonal(int axis,
 	}
 
 	MaterialInfo mi, min1, mip1, min2, mip2;
-	
+	//std::cout << axis << " " << omp_thread_count() << " " << omp_get_num_threads() << std::endl;
+	#pragma omp parallel for
 	for (int i2 = 1; i2 < num_2-1; ++i2)
 	{
+		int tid = omp_get_thread_num();
+		std::vector<double> & a = tridiagonal_data[tid].a;
+		std::vector<double> & b = tridiagonal_data[tid].b;
+		std::vector<double> & c = tridiagonal_data[tid].c;
+		std::vector<double> & f = tridiagonal_data[tid].f;
+		std::vector<double> & x = tridiagonal_solution[tid];
 		/*
 		a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 		a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
 		*/
-
 		// Setting boundary conditions
 		SetBoundaryConditions(axis, {0, i2}, a, b, c, f);
-		
+
 		for (int i1 = 1; i1 < num_1-1; ++i1)
 		{
 			if (axis == 0)
@@ -364,8 +391,15 @@ void Solver<3>::IterateTridiagonal(int axis,
 
 	MaterialInfo mi, min1, mip1, min2, mip2, min3, mip3;
 
+	#pragma omp parallel for
 	for (int i3 = 1; i3 < num_3-1; ++i3)
 	{
+		int tid = omp_get_thread_num();
+		std::vector<double> & a = tridiagonal_data[tid].a;
+		std::vector<double> & b = tridiagonal_data[tid].b;
+		std::vector<double> & c = tridiagonal_data[tid].c;
+		std::vector<double> & f = tridiagonal_data[tid].f;
+		std::vector<double> & x = tridiagonal_solution[tid];
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
             /*

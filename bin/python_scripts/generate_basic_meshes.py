@@ -78,5 +78,5 @@ generate_zeroes("../meshes/zeroes2d.mesh", (64, 64), (10.0, 10.0))
 generate_half_zeroes_half_ones("../meshes/half3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0))
 generate_half_zeroes_half_ones("../meshes/half2d.mesh", (64, 64), (10.0, 10.0))
 
-generate_box_2d("../meshes/box2d.mesh", (64, 64), (10.0, 10.0), 4.0)
+generate_box_2d("../meshes/box2d_512.mesh", (512, 512), (10.0, 10.0), 4.0)
 generate_box_3d("../meshes/box3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0), 4.0)
