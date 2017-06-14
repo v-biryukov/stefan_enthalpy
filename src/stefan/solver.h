@@ -20,22 +20,24 @@ class Solver
 	std::vector<double> a, b, c, f, x;
 
 	// Boundary conditions
-	std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
+    std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
+    const double boundary_condition_eps = 1e-15;
 
-	void SetEnthalpyByTData(const std::vector<double> & temperature_data)
+    void SetEnthalpyByTData(const std::vector<double>& temperature_data)
 	{
 		for (int i = 0; i < mesh.GetNumberOfNodes(); ++i)
 			enthalpy_data[i] = mesh.GetMaterialInfo(i).GetEnthalpyByT(temperature_data[i]);
 	}
 
-	void SolveTridiagonal (int n, std::vector<double> & a, 
-		std::vector<double> & b, std::vector<double> & c, 
-		std::vector<double> & f, std::vector<double> & x)
+    static void SolveTridiagonal (int n, std::vector<double>& a,
+        std::vector<double>& b, std::vector<double>& c,
+        std::vector<double>& f, std::vector<double>& x)
 	{
 		double m;
 		for (int i = 1; i < n; i++)
 		{
 			m = a[i]/b[i-1];
+
 			b[i] = b[i] - m*c[i-1];
 			f[i] = f[i] - m*f[i-1];
 		}
@@ -43,10 +45,12 @@ class Solver
 		x[n-1] = f[n-1]/b[n-1];
 
 		for (int i = n - 2; i >= 0; i--)
+        {
 			x[i]=(f[i]-c[i]*x[i+1])/b[i];
+        }
 	}
 
-	double CalculateLinfNorm(const std::vector<double>& a, const std::vector<double>& b)
+    static double CalculateLinfNorm(const std::vector<double>& a, const std::vector<double>& b)
 	{
 		assert(a.size() == b.size());
 		double Linf_norm = 0.0;
@@ -59,7 +63,7 @@ class Solver
 		return Linf_norm;
 	}
 
-	double CalculateLinfNorm(const std::vector<double>& a)
+    static double CalculateLinfNorm(const std::vector<double>& a)
 	{
 		double Linf_norm = 0.0;
 		for (int i = 0; i < a.size(); ++i)
@@ -71,7 +75,7 @@ class Solver
 		return Linf_norm;
 	}
 
-	static void Assign(std::vector<double>& to, const std::vector<double>& from)
+    static void Assign(std::vector<double>& to, const std::vector<double>& from)
 	{
 		assert(to.size() == from.size());
 		std::copy_n(from.begin(), to.size(), to.begin());
@@ -99,20 +103,27 @@ class Solver
 		double h = mesh.GetSteps()[axis];
 		std::rotate(index.begin(), index.begin() + axis, index.end());
 		index[axis] = 0;
-		double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+
+        double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+        if (fabs(alpha) < boundary_condition_eps)
+            alpha = boundary_condition_eps;
 		double beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
-		a[0] = 0.0; 
-		b[0] = alpha*(boundary_conditions[2*axis][0] - boundary_conditions[2*axis][1]/h); 
-		c[0] = boundary_conditions[2*axis][1] * alpha / h; 
-		f[0] = boundary_conditions[2*axis][2] - boundary_conditions[2*axis][0] * beta;
+
+        a[0] = 0.0;
+        b[0] = alpha*(boundary_conditions[2*axis][0] - boundary_conditions[2*axis][1]/h);
+        c[0] = boundary_conditions[2*axis][1] * alpha / h ;
+        f[0] = (boundary_conditions[2*axis][2] - boundary_conditions[2*axis][0] * beta);
+
 		index[axis] = num-1;
 		alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+        if (fabs(alpha) < boundary_condition_eps)
+            alpha = boundary_condition_eps;
 		beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
-		a[num-1] = -boundary_conditions[2*axis+1][1] * alpha / h; 
-		b[num-1] = alpha*(boundary_conditions[2*axis+1][0] + boundary_conditions[2*axis+1][1]/h); 
+        a[num-1] = -boundary_conditions[2*axis+1][1] * alpha / h ;
+        b[num-1] = alpha*(boundary_conditions[2*axis+1][0] + boundary_conditions[2*axis+1][1]/h);
 		c[num-1] = 0.0; 
-		f[num-1] = boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta;
-	}
+        f[num-1] = (boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta);
+    }
 
 
 	void IterateTridiagonal(int axis, 
@@ -147,7 +158,7 @@ public:
 			Step(i, dt);
 	}
 
-	void SaveToVtk(std::string name)
+    void SaveToVtk(std::string name) const
 	{
 		std::ofstream vtk_file(name.c_str());
 		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
@@ -190,7 +201,7 @@ public:
 		vtk_file << "LOOKUP_TABLE default\n";
 		for(std::size_t i = 0; i < enthalpy_data.size(); ++i)
 		{
-			MaterialInfo & mi = mesh.GetMaterialInfo(i);
+            const MaterialInfo& mi = mesh.GetMaterialInfo(i);
 			double T = mi.GetTByEnthalpy(enthalpy_data[i]);
 			double state;
 			if (T <= mi.T1)
@@ -352,18 +363,18 @@ void Solver<3>::IterateTridiagonal(int axis,
 	}
 
 	MaterialInfo mi, min1, mip1, min2, mip2, min3, mip3;
-	
+
 	for (int i3 = 1; i3 < num_3-1; ++i3)
 	{
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
-			/*
-			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
+            /*
+            a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 			a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
-			*/
+            */
 
 			// Setting boundary conditions
-			SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
+            SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
 
 
 			for (int i1 = 1; i1 < num_1-1; ++i1)

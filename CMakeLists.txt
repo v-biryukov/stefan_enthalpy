@@ -67,6 +67,7 @@ set(sources
   ./src/stefan/material_info.h
   ./src/stefan/mesh.h
   ./src/stefan/solver.h
+  ./src/stefan/settings_parser.h
 )
 
 set(TinyXmlSrc

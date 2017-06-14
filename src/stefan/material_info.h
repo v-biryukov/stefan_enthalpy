@@ -26,7 +26,7 @@ struct MaterialInfo
 	{
 	}
 
-	double GetEnthalpyByT(double T)
+    double GetEnthalpyByT(double T) const
 	{
 		double E;
 		if (T < T1)
@@ -38,7 +38,7 @@ struct MaterialInfo
 		return E;
 	}
 
-	double GetTByEnthalpy(double enthalpy)
+    double GetTByEnthalpy(double enthalpy) const
 	{
 		double E1 = GetB() * T1;
 		double E2 = GetR1() * T2 + GetR2();
@@ -50,7 +50,7 @@ struct MaterialInfo
 			return (enthalpy - GetR2()) / GetR1();
 	}
 
-	double GetThermalConductivityByE(double enthalpy)
+    double GetThermalConductivityByE(double enthalpy) const
 	{
 		double E1 = GetB() * T1;
 		double E2 = GetR1() * T2 + GetR2();
@@ -62,7 +62,7 @@ struct MaterialInfo
 			return thermal_conductivity_L;
 	}
 
-	double GetAlpha(double enthalpy)
+    double GetAlpha(double enthalpy) const
 	{
 		double E1 = GetB() * T1;
 		double E2 = GetR1() * T2 + GetR2();
@@ -75,7 +75,7 @@ struct MaterialInfo
 	}
 
 
-	double GetBeta(double enthalpy)
+    double GetBeta(double enthalpy) const
 	{
 		double E1 = GetB() * T1;
 		double E2 = GetR1() * T2 + GetR2();
@@ -88,27 +88,27 @@ struct MaterialInfo
 	}
 
 private:
-	double GetB()
+    double GetB() const
 	{
 		return rho_S * specific_heat_capacity_S;
 	}
 
-	double GetP1()
+    double GetP1() const
 	{
-		return (T2-T1)/(rho_S*specific_heat_fusion);
+        return (T2-T1)/(rho_S*specific_heat_fusion);
 	}
 
-	double GetP2()
+    double GetP2() const
 	{
-		return T1*(1.0 - specific_heat_capacity_S*(T2-T1)/specific_heat_fusion);
+        return T1*(1.0 - specific_heat_capacity_S*(T2-T1)/specific_heat_fusion);
 	}
 
-	double GetR1()
+    double GetR1() const
 	{
 		return rho_L * specific_heat_capacity_L;
 	}
 
-	double GetR2()
+    double GetR2() const
 	{
 		return rho_S * specific_heat_fusion + rho_S * specific_heat_capacity_S * T1 - rho_L * specific_heat_capacity_L * T2;
 	}

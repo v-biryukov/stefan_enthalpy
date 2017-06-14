@@ -23,12 +23,9 @@ template <int Dims>
 void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums, 
     std::array<double, Dims> & lengths, std::vector<int> & material_indexes)
 {
-	std::ifstream file (file_name, std::ios::in|std::ios::binary|std::ios::ate);
+    std::ifstream file (file_name, std::ios::binary);
 	if (file.is_open())
 	{
-		std::streampos size;
-		size = file.tellg();
-		file.seekg (0, std::ios::beg);
 		file.read ((char*)nums.data(), Dims * sizeof(int));
 		file.read ((char*)lengths.data(), Dims * sizeof(double));
         int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
@@ -46,12 +43,9 @@ void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums,
 template <int Dims>
 void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std::vector<double> & initial_temperatures)
 {
-	std::ifstream file (file_name, std::ios::in|std::ios::binary|std::ios::ate);
+    std::ifstream file (file_name, std::ios::binary);
 	if (file.is_open())
 	{
-		std::streampos size;
-		size = file.tellg();
-		file.seekg (0, std::ios::beg);
         int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
 		initial_temperatures.reserve(num_of_nodes);
 		file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
@@ -75,7 +69,7 @@ int Run(const Settings & settings)
 	std::vector<MaterialInfo> material_infos;
 	for (auto mi : settings.mesh_settings.medium_params_info)
 	{
-		material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S, 
+        material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S,
 			mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
 			mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
 	}
