@@ -18,33 +18,33 @@ public:
 
 	Mesh() = default;
 	Mesh(std::array<int, Dims> nums, std::array<double, Dims> lengths,
-         const std::vector<MaterialInfo>& material_infos,
-         const std::vector<int>& material_indexes_)
-		: nums_(nums), lengths_(lengths), steps_(steps_), 
+		 const std::vector<MaterialInfo>& material_infos,
+		 const std::vector<int>& material_indexes_)
+		: nums_(nums), lengths_(lengths), steps_(steps_),
 		material_infos_(material_infos), material_indexes_(material_indexes_)
 	{
 		for (int i = 0; i < Dims; ++i)
 			steps_[i] = lengths_[i] / (nums_[i] - 1);
-		
+
 		number_of_nodes_ = std::accumulate(nums_.begin(), nums_.end(), 1, std::multiplies<int>());
 	}
 
-    int GetGlobalId(std::array<int, Dims> ids) const;
+	int GetGlobalId(std::array<int, Dims> ids) const;
 
-    const MaterialInfo& GetMaterialInfo(std::array<int, Dims> ids) const
+	const MaterialInfo& GetMaterialInfo(std::array<int, Dims> ids) const
 	{
 		return material_infos_[material_indexes_[GetGlobalId(ids)]];
 	}
 
-    const MaterialInfo& GetMaterialInfo(int global_id) const
+	const MaterialInfo& GetMaterialInfo(int global_id) const
 	{
 		return material_infos_[material_indexes_[global_id]];
 	}
 
-    inline std::array<double, Dims> GetLengths() const {return lengths_;}
-    inline std::array<double, Dims> GetSteps() const {return steps_;}
-    inline std::array<int, Dims> GetNums() const {return nums_;}
-    inline int GetNumberOfNodes() const {return number_of_nodes_;}
+	inline std::array<double, Dims> GetLengths() const {return lengths_;}
+	inline std::array<double, Dims> GetSteps() const {return steps_;}
+	inline std::array<int, Dims> GetNums() const {return nums_;}
+	inline int GetNumberOfNodes() const {return number_of_nodes_;}
 };
 
 template<>

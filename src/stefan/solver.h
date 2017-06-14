@@ -27,18 +27,18 @@ class Solver
 	std::vector<std::vector<double>> tridiagonal_solution;
 
 	// Boundary conditions
-    std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
+	std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
 	const double boundary_condition_eps = 1e-15;
 
-    void SetEnthalpyByTData(const std::vector<double>& temperature_data)
+	void SetEnthalpyByTData(const std::vector<double>& temperature_data)
 	{
 		for (int i = 0; i < mesh.GetNumberOfNodes(); ++i)
 			enthalpy_data[i] = mesh.GetMaterialInfo(i).GetEnthalpyByT(temperature_data[i]);
 	}
 
-    static void SolveTridiagonal (int n, std::vector<double>& a,
-        std::vector<double>& b, std::vector<double>& c,
-        std::vector<double>& f, std::vector<double>& x)
+	static void SolveTridiagonal (int n, std::vector<double>& a,
+		std::vector<double>& b, std::vector<double>& c,
+		std::vector<double>& f, std::vector<double>& x)
 	{
 		double m;
 		for (int i = 1; i < n; i++)
@@ -57,7 +57,7 @@ class Solver
 		}
 	}
 
-    static double CalculateLinfNorm(const std::vector<double>& a, const std::vector<double>& b)
+	static double CalculateLinfNorm(const std::vector<double>& a, const std::vector<double>& b)
 	{
 		assert(a.size() == b.size());
 		double Linf_norm = 0.0;
@@ -70,7 +70,7 @@ class Solver
 		return Linf_norm;
 	}
 
-    static double CalculateLinfNorm(const std::vector<double>& a)
+	static double CalculateLinfNorm(const std::vector<double>& a)
 	{
 		double Linf_norm = 0.0;
 		for (int i = 0; i < a.size(); ++i)
@@ -82,7 +82,7 @@ class Solver
 		return Linf_norm;
 	}
 
-    static void Assign(std::vector<double>& to, const std::vector<double>& from)
+	static void Assign(std::vector<double>& to, const std::vector<double>& from)
 	{
 		assert(to.size() == from.size());
 		std::copy_n(from.begin(), to.size(), to.begin());
@@ -111,7 +111,7 @@ class Solver
 		std::rotate(index.begin(), index.begin() + axis, index.end());
 		index[axis] = 0;
 
-        double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
+		double alpha = mesh.GetMaterialInfo(index).GetAlpha(enthalpy_data[mesh.GetGlobalId(index)]);
 		if (fabs(alpha) < boundary_condition_eps)
 			alpha = boundary_condition_eps;
 		double beta = mesh.GetMaterialInfo(index).GetBeta(enthalpy_data[mesh.GetGlobalId(index)]);
@@ -139,26 +139,27 @@ class Solver
 		std::vector<double>& next_iteration_data,
 		double dt);
 
-
-public:
-	int omp_thread_count() {
+	static int omp_thread_count() {
 		int n = 0;
 		#pragma omp parallel reduction(+:n)
 		n += 1;
 		return n;
 	}
 
+public:
 
-    Solver(Mesh<Dims> & mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double> & temperature_data)
-        : mesh(mesh), boundary_conditions(boundary_conditions)
+
+
+	Solver(Mesh<Dims> & mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double> & temperature_data)
+		: mesh(mesh), boundary_conditions(boundary_conditions)
 	{
 		enthalpy_data.resize(mesh.GetNumberOfNodes());
 		current_iteration_data.resize(mesh.GetNumberOfNodes());
 		next_iteration_data.resize(mesh.GetNumberOfNodes());
 
 		SetEnthalpyByTData(temperature_data);
-        auto nums = mesh.GetNums();
-        auto max_n = *std::max_element(nums.begin(), nums.end());
+		auto nums = mesh.GetNums();
+		auto max_n = *std::max_element(nums.begin(), nums.end());
 
 		int num_of_threads = omp_thread_count();
 		tridiagonal_data.resize(num_of_threads);
@@ -179,7 +180,7 @@ public:
 			Step(i, dt);
 	}
 
-    void SaveToVtk(std::string name) const
+	void SaveToVtk(std::string name) const
 	{
 		std::ofstream vtk_file(name.c_str());
 		vtk_file << "# vtk DataFile Version 3.0\nVx data\nASCII\n\n";
@@ -201,7 +202,7 @@ public:
 		
 		for(std::size_t i = 0; i < enthalpy_data.size(); ++i)
 		{
-	    	vtk_file <<  enthalpy_data[i] << "\n";
+			vtk_file <<  enthalpy_data[i] << "\n";
 		}
 
 		vtk_file << "SCALARS T FLOAT\n";
@@ -222,7 +223,7 @@ public:
 		vtk_file << "LOOKUP_TABLE default\n";
 		for(std::size_t i = 0; i < enthalpy_data.size(); ++i)
 		{
-            const MaterialInfo& mi = mesh.GetMaterialInfo(i);
+			const MaterialInfo& mi = mesh.GetMaterialInfo(i);
 			double T = mi.GetTByEnthalpy(enthalpy_data[i]);
 			double state;
 			if (T <= mi.T1)
@@ -402,13 +403,13 @@ void Solver<3>::IterateTridiagonal(int axis,
 		std::vector<double> & x = tridiagonal_solution[tid];
 		for (int i2 = 1; i2 < num_2-1; ++i2)
 		{
-            /*
-            a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
+			/*
+			a[0] = 0.0; b[0] = -1.0; c[0] = 1.0; f[0] = 0.0;
 			a[num_1-1] = -1.0; b[num_1-1] = 1.0; c[num_1-1] = 0.0; f[num_1-1] = 0.0;
-            */
+			*/
 
 			// Setting boundary conditions
-            SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
+			SetBoundaryConditions(axis, {0, i2, i3}, a, b, c, f);
 
 
 			for (int i1 = 1; i1 < num_1-1; ++i1)

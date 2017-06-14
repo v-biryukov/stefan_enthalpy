@@ -21,15 +21,15 @@ void PrintHelpInfo()
 
 template <int Dims>
 void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums, 
-    std::array<double, Dims> & lengths, std::vector<int> & material_indexes)
+	std::array<double, Dims> & lengths, std::vector<int> & material_indexes)
 {
-    std::ifstream file (file_name, std::ios::binary);
+	std::ifstream file (file_name, std::ios::binary);
 	if (file.is_open())
 	{
 		file.read ((char*)nums.data(), Dims * sizeof(int));
 		file.read ((char*)lengths.data(), Dims * sizeof(double));
-        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-        material_indexes.resize(num_of_nodes);
+		int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+		material_indexes.resize(num_of_nodes);
 		file.read ((char*)material_indexes.data(), num_of_nodes * sizeof(int));
 		file.close();
 	}
@@ -43,17 +43,17 @@ void ReadMeshFile(std::string file_name, std::array<int, Dims> & nums,
 template <int Dims>
 void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std::vector<double> & initial_temperatures)
 {
-    std::ifstream file (file_name, std::ios::binary);
+	std::ifstream file (file_name, std::ios::binary);
 	if (file.is_open())
 	{
-        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+		int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
 		initial_temperatures.reserve(num_of_nodes);
 		file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
 		file.close();
 	}
 	else 
 	{
-        std::cerr << "Error: Unable to open initial temperatures file \n";
+		std::cerr << "Error: Unable to open initial temperatures file \n";
 		std::exit(EXIT_FAILURE);
 	}
 }
@@ -69,7 +69,7 @@ int Run(const Settings & settings)
 	std::vector<MaterialInfo> material_infos;
 	for (auto mi : settings.mesh_settings.medium_params_info)
 	{
-        material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S,
+		material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S,
 			mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
 			mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
 	}
@@ -77,23 +77,23 @@ int Run(const Settings & settings)
 	Mesh<Dims> mesh = Mesh<Dims>(nums, lengths, material_infos, material_indexes);
 
 	std::vector<double> initial_temperatures;
-    if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
-    {
-        ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
-    }
-    else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
-    {
-        for (auto el : material_indexes)
-            initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[el]);
-    }
+	if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
+	{
+		ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
+	}
+	else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
+	{
+		for (auto el : material_indexes)
+			initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[el]);
+	}
 
-    std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
-    for (int i = 0; i < boundary_conditions.size(); ++i)
-        boundary_conditions[i] = settings.mesh_settings.boundary_settings_info[i].params;
-    Solver<Dims> sol = Solver<Dims>(mesh, boundary_conditions, initial_temperatures);
+	std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
+		for (int i = 0; i < boundary_conditions.size(); ++i)
+		boundary_conditions[i] = settings.mesh_settings.boundary_settings_info[i].params;
+	Solver<Dims> sol = Solver<Dims>(mesh, boundary_conditions, initial_temperatures);
 	for (int time_step_num = 0; time_step_num < settings.task_settings.number_of_steps; ++time_step_num)
 	{
-        if (time_step_num % settings.snapshot_settings_info.period_frames == 0)
+		if (time_step_num % settings.snapshot_settings_info.period_frames == 0)
 		{
 			std::stringstream ss;
 			ss << time_step_num;
@@ -101,7 +101,7 @@ int Run(const Settings & settings)
 			sol.SaveToVtk("out/result_" + ss.str() + ".vtk");
 		}
 
-        sol.Step(settings.task_settings.time_step);
+		sol.Step(settings.task_settings.time_step);
 	}
 	return 0;
 }
@@ -114,7 +114,7 @@ int main(int argc, char ** argv)
 		PrintHelpInfo();
 		std::exit(EXIT_FAILURE);
 	}
-    else if (!std::string(argv[1]).compare("-h") || !std::string(argv[1]).compare("--help"))
+	else if (!std::string(argv[1]).compare("-h") || !std::string(argv[1]).compare("--help"))
 	{
 		PrintHelpInfo();
 		std::exit(EXIT_SUCCESS);

@@ -164,16 +164,16 @@ Settings ParseFile(std::string xml_file_path)
 	}
 
 
-        TiXmlElement* task_info_element = xml_element->FirstChildElement("Task");
-        if (task_info_element)
-        {
-                ParseTaskInfo(task_info_element, settings);
-        } else
-        {
-                std::cerr << "Error: There is no Task section \n";
-                std::exit(EXIT_FAILURE);
-        }
-        return settings;
+	TiXmlElement* task_info_element = xml_element->FirstChildElement("Task");
+	if (task_info_element)
+	{
+		ParseTaskInfo(task_info_element, settings);
+	} else
+	{
+		std::cerr << "Error: There is no Task section \n";
+		std::exit(EXIT_FAILURE);
+	}
+	return settings;
 
 }
 
@@ -200,37 +200,37 @@ void ParseMeshInfo(TiXmlElement *mesh_info_element, Settings & settings)
 			settings.mesh_settings.medium_params_info.push_back(temp_medium_params);
 			submesh_element = submesh_element->NextSiblingElement("Submesh");
 		};
-        }
-        TiXmlElement * boundaries_element = mesh_info_element->FirstChildElement("Boundaries");
-        if (boundaries_element)
-        {
-                TiXmlElement * custom_boundaries_element = boundaries_element->FirstChildElement("Custom");
-                while (custom_boundaries_element)
-                {
-                        Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-                        temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::Custom;
-                        std::string axis_temp_string;
-                        ParseString(custom_boundaries_element, "axis", &axis_temp_string);
-                        if (!axis_temp_string.compare("x"))
-                                temp_boundary_setings.axis = 0;
-                        else if (!axis_temp_string.compare("y"))
-                                temp_boundary_setings.axis = 1;
-                        else if (!axis_temp_string.compare("z"))
-                                temp_boundary_setings.axis = 2;
-                        else
-                        {
-                                std::cerr << "Error: Wrong boundary axis settings \n";
-                                std::exit(EXIT_FAILURE);
-                        }
-                        ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
-                        std::vector<double> temp_vector;
-                        ParseVector(custom_boundaries_element, "params", &temp_vector);
-                        std::copy_n(temp_vector.begin(), 3, temp_boundary_setings.params.begin());
-                        settings.mesh_settings.boundary_settings_info.push_back(temp_boundary_setings);
+		}
+		TiXmlElement * boundaries_element = mesh_info_element->FirstChildElement("Boundaries");
+		if (boundaries_element)
+		{
+				TiXmlElement * custom_boundaries_element = boundaries_element->FirstChildElement("Custom");
+				while (custom_boundaries_element)
+				{
+						Settings::MeshSettings::BoundarySettings temp_boundary_setings;
+						temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::Custom;
+						std::string axis_temp_string;
+						ParseString(custom_boundaries_element, "axis", &axis_temp_string);
+						if (!axis_temp_string.compare("x"))
+								temp_boundary_setings.axis = 0;
+						else if (!axis_temp_string.compare("y"))
+								temp_boundary_setings.axis = 1;
+						else if (!axis_temp_string.compare("z"))
+								temp_boundary_setings.axis = 2;
+						else
+						{
+								std::cerr << "Error: Wrong boundary axis settings \n";
+								std::exit(EXIT_FAILURE);
+						}
+						ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
+						std::vector<double> temp_vector;
+						ParseVector(custom_boundaries_element, "params", &temp_vector);
+						std::copy_n(temp_vector.begin(), 3, temp_boundary_setings.params.begin());
+						settings.mesh_settings.boundary_settings_info.push_back(temp_boundary_setings);
 
-                        custom_boundaries_element = custom_boundaries_element->NextSiblingElement("Custom");
-                }
-        }
+						custom_boundaries_element = custom_boundaries_element->NextSiblingElement("Custom");
+				}
+		}
 }
 
 
@@ -249,8 +249,8 @@ void ParseSnapshotInfo(TiXmlElement *snapshot_info_element, Settings & settings)
 
 void ParseTaskInfo(TiXmlElement *task_info_element, Settings & settings)
 {
-        ParseScalar(task_info_element, "timeStep", &(settings.task_settings.time_step));
-        ParseUnsigned(task_info_element, "numberOfSteps", &(settings.task_settings.number_of_steps));
+	ParseScalar(task_info_element, "timeStep", &(settings.task_settings.time_step));
+	ParseUnsigned(task_info_element, "numberOfSteps", &(settings.task_settings.number_of_steps));
 	TiXmlElement * ini_state_element = task_info_element->FirstChildElement("IniState");
 
 
