@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Settings dimsCount = "2">
-	<Mesh meshFile="meshes/box2d_512.mesh">
+<Settings dimsCount = "3">
+	<Mesh meshFile="meshes/ball3d_128.mesh">
 		<MediumParams>
 			<Submesh index="0" TPhase = "273.0" rhoL = "1000.0" rhoS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
@@ -12,7 +12,7 @@
 
 
 		<Boundaries>
-			<Custom axis = "x" side = "0" params = "1 0 1000"/>
+			<Custom axis = "x" side = "0" params = "0 1 0"/>
 			<Custom axis = "x" side = "1" params = "0 1 0"/>
 			<Custom axis = "y" side = "0" params = "0 1 0"/>
 			<Custom axis = "y" side = "1" params = "0 1 0"/>
@@ -22,16 +22,16 @@
 	</Mesh>
 
 	<Snapshot>
-		<Period frames="10"/>
+		<Period frames="100"/>
 		<Data fileName = "out/snapshot<step>.vtk" stride="1 1" writeTemperature="true" writePhase="true"/>
 	</Snapshot>
 
-	<Task numberOfSteps = "300" timeStep = "3000">
+	<Task numberOfSteps = "20" timeStep = "500">
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>
 				<Submesh index="0" temperature="200"/>
-				<Submesh index="1" temperature="230"/>
+				<Submesh index="1" temperature="300"/>
 			</PerSubmesh>
 		</IniState>
 	</Task>

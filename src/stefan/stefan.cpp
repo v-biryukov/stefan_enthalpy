@@ -69,7 +69,7 @@ int Run(const Settings & settings)
 	std::vector<MaterialInfo> material_infos;
 	for (auto mi : settings.mesh_settings.medium_params_info)
 	{
-		material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.rho_L, mi.rho_S,
+		material_infos.push_back(MaterialInfo(mi.T_phase-2.5, mi.T_phase+2.5, mi.rho_L, mi.rho_S,
 			mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
 			mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
 	}
@@ -97,9 +97,9 @@ int Run(const Settings & settings)
 		{
 			std::stringstream ss;
 			ss << time_step_num;
-			std::cout << "step: " << time_step_num << std::endl;
 			sol.SaveToVtk("out/result_" + ss.str() + ".vtk");
 		}
+		std::cout << "step: " << time_step_num << std::endl;
 
 		sol.Step(settings.task_settings.time_step);
 	}
