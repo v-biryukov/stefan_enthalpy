@@ -1,3 +1,4 @@
+#pragma once
 #include <array>
 #include <vector>
 #include <numeric>
@@ -30,6 +31,7 @@ public:
 		number_of_nodes_ = std::accumulate(nums_.begin(), nums_.end(), 1, std::multiplies<int>());
 	}
 
+	std::array<int, Dims> GetIds(int global_id) const;
 	int GetGlobalId(std::array<int, Dims> ids) const;
 
 	const MaterialInfo& GetMaterialInfo(std::array<int, Dims> ids) const
@@ -56,10 +58,20 @@ public:
 	inline std::array<double, Dims> GetSteps() const {return steps_;}
 	inline std::array<int, Dims> GetNums() const {return nums_;}
 	inline int GetNumberOfNodes() const {return number_of_nodes_;}
-
-	//const std::vector<int> GetMaterialIndexes() const {return material_indexes_;}
-	//const std::vector<MaterialInfo> GetMaterialInfos() const {return material_infos_;}
 };
+
+template<>
+std::array<int, 2> Mesh<2>::GetIds(int global_id) const
+{
+
+	return {global_id % nums_[0], global_id / nums_[0]};
+}
+
+template<>
+std::array<int, 3> Mesh<3>::GetIds(int global_id) const
+{
+	return {global_id % nums_[0], (global_id / nums_[0]) % nums_[1],  global_id / (nums_[0] * nums_[1])};
+}
 
 template<>
 int Mesh<2>::GetGlobalId(std::array<int, 2> ids) const

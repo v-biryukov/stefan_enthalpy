@@ -1,3 +1,4 @@
+#pragma once
 #include <stdlib.h> 
 #include <iostream>
 #include <sstream>
@@ -44,7 +45,7 @@ struct Settings
 		int period_frames;
 		std::string snaphot_data_path;
 		std::vector<int> stride;
-		bool write_temperatures;
+		bool write_temperature;
 		bool write_enthalpy;
 		bool write_thermal_elasticity;
 		bool write_state;
@@ -177,6 +178,23 @@ Settings ParseFile(std::string xml_file_path)
 
 }
 
+void ParseBoundaryAxis(TiXmlElement * local_boundaries_element, int & axis)
+{
+	std::string axis_temp_string;
+	ParseString(local_boundaries_element, "axis", &axis_temp_string);
+	if (!axis_temp_string.compare("x"))
+			axis = 0;
+	else if (!axis_temp_string.compare("y"))
+			axis = 1;
+	else if (!axis_temp_string.compare("z"))
+			axis = 2;
+	else
+	{
+			std::cerr << "Error: Wrong boundary axis settings \n";
+			std::exit(EXIT_FAILURE);
+	}
+}
+
 void ParseMeshInfo(TiXmlElement *mesh_info_element, Settings & settings)
 {
 	ParseString(mesh_info_element, "meshFile", &settings.mesh_settings.mesh_file);
@@ -200,37 +218,59 @@ void ParseMeshInfo(TiXmlElement *mesh_info_element, Settings & settings)
 			settings.mesh_settings.medium_params_info.push_back(temp_medium_params);
 			submesh_element = submesh_element->NextSiblingElement("Submesh");
 		};
-		}
-		TiXmlElement * boundaries_element = mesh_info_element->FirstChildElement("Boundaries");
-		if (boundaries_element)
-		{
-				TiXmlElement * custom_boundaries_element = boundaries_element->FirstChildElement("Custom");
-				while (custom_boundaries_element)
-				{
-						Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-						temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::Custom;
-						std::string axis_temp_string;
-						ParseString(custom_boundaries_element, "axis", &axis_temp_string);
-						if (!axis_temp_string.compare("x"))
-								temp_boundary_setings.axis = 0;
-						else if (!axis_temp_string.compare("y"))
-								temp_boundary_setings.axis = 1;
-						else if (!axis_temp_string.compare("z"))
-								temp_boundary_setings.axis = 2;
-						else
-						{
-								std::cerr << "Error: Wrong boundary axis settings \n";
-								std::exit(EXIT_FAILURE);
-						}
-						ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
-						std::vector<double> temp_vector;
-						ParseVector(custom_boundaries_element, "params", &temp_vector);
-						std::copy_n(temp_vector.begin(), 3, temp_boundary_setings.params.begin());
-						settings.mesh_settings.boundary_settings_info.push_back(temp_boundary_setings);
+	}
 
-						custom_boundaries_element = custom_boundaries_element->NextSiblingElement("Custom");
-				}
+	settings.mesh_settings.boundary_settings_info.resize(2 * settings.dims_count);
+	// Setting default boundary conditions: fixed flux = 0.0
+	for (int i = 0; i < settings.mesh_settings.boundary_settings_info.size(); ++i)
+	{
+		settings.mesh_settings.boundary_settings_info[i].params = {0, 1, 0};
+	}
+	// Reading boundary conditions settings
+	TiXmlElement * boundaries_element = mesh_info_element->FirstChildElement("Boundaries");
+	if (boundaries_element)
+	{
+		TiXmlElement * custom_boundaries_element = boundaries_element->FirstChildElement("Custom");
+		while (custom_boundaries_element)
+		{
+				Settings::MeshSettings::BoundarySettings temp_boundary_setings;
+				temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::Custom;
+				ParseBoundaryAxis(custom_boundaries_element, temp_boundary_setings.axis);
+				ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
+				std::vector<double> temp_vector;
+				ParseVector(custom_boundaries_element, "params", &temp_vector);
+				std::copy_n(temp_vector.begin(), 3, temp_boundary_setings.params.begin());
+				settings.mesh_settings.boundary_settings_info[2*temp_boundary_setings.axis + temp_boundary_setings.side] = temp_boundary_setings;
+				custom_boundaries_element = custom_boundaries_element->NextSiblingElement("Custom");
 		}
+
+		TiXmlElement * fixedflux_boundaries_element = boundaries_element->FirstChildElement("FixedFlux");
+		while (fixedflux_boundaries_element)
+		{
+			Settings::MeshSettings::BoundarySettings temp_boundary_setings;
+			temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::FixedFlux;
+			ParseBoundaryAxis(fixedflux_boundaries_element, temp_boundary_setings.axis);
+			ParseUnsigned(fixedflux_boundaries_element, "side", &temp_boundary_setings.side);
+			double flux;
+			ParseScalar(fixedflux_boundaries_element, "flux", &(flux));
+			temp_boundary_setings.params = {0, 1, flux};
+			settings.mesh_settings.boundary_settings_info[2*temp_boundary_setings.axis + temp_boundary_setings.side] = temp_boundary_setings;
+			fixedflux_boundaries_element = fixedflux_boundaries_element->NextSiblingElement("FixedFlux");
+		}
+		TiXmlElement * fixedtemperature_boundaries_element = boundaries_element->FirstChildElement("FixedTemperature");
+		while (fixedtemperature_boundaries_element)
+		{
+			Settings::MeshSettings::BoundarySettings temp_boundary_setings;
+			temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::FixedTemperature;
+			ParseBoundaryAxis(fixedtemperature_boundaries_element, temp_boundary_setings.axis);
+			ParseUnsigned(fixedtemperature_boundaries_element, "side", &temp_boundary_setings.side);
+			double temperature;
+			ParseScalar(fixedtemperature_boundaries_element, "temperature", &(temperature));
+			temp_boundary_setings.params = {1, 0, temperature};
+			settings.mesh_settings.boundary_settings_info[2*temp_boundary_setings.axis + temp_boundary_setings.side] = temp_boundary_setings;
+			fixedtemperature_boundaries_element = fixedtemperature_boundaries_element->NextSiblingElement("FixedTemperature");
+		}
+	}
 }
 
 
@@ -240,7 +280,7 @@ void ParseSnapshotInfo(TiXmlElement *snapshot_info_element, Settings & settings)
 	TiXmlElement * snapshot_data_element = snapshot_info_element->FirstChildElement("Data");
 	ParseString(snapshot_data_element, "fileName", &settings.snapshot_settings_info.snaphot_data_path);
 	ParseVector(snapshot_data_element, "stride", &settings.snapshot_settings_info.stride);
-	ParseBool(snapshot_data_element, "writeTemperatures", &settings.snapshot_settings_info.write_temperatures);
+	ParseBool(snapshot_data_element, "writeTemperature", &settings.snapshot_settings_info.write_temperature);
 	ParseBool(snapshot_data_element, "writeEnthalpy", &settings.snapshot_settings_info.write_enthalpy);
 	ParseBool(snapshot_data_element, "writeThermalElasticity", &settings.snapshot_settings_info.write_thermal_elasticity);
 	ParseBool(snapshot_data_element, "writeState", &settings.snapshot_settings_info.write_state);
@@ -252,8 +292,6 @@ void ParseTaskInfo(TiXmlElement *task_info_element, Settings & settings)
 	ParseScalar(task_info_element, "timeStep", &(settings.task_settings.time_step));
 	ParseUnsigned(task_info_element, "numberOfSteps", &(settings.task_settings.number_of_steps));
 	TiXmlElement * ini_state_element = task_info_element->FirstChildElement("IniState");
-
-
 
 	TiXmlElement * ini_state_per_node_element = ini_state_element->FirstChildElement("PerNode");
 	TiXmlElement * ini_state_per_submesh_element = ini_state_element->FirstChildElement("PerSubmesh");
