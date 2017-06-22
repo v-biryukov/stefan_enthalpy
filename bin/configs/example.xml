@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Settings dimsCount = "3">
-	<Mesh meshFile="meshes/ball3d_128.mesh">
+<Settings dimsCount = "2">
+	<Mesh meshFile="meshes/ball2d_1024.mesh">
 		<MediumParams>
 			<Submesh index="0" TPhase = "273.0" rhoL = "1000.0" rhoS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
@@ -22,11 +22,11 @@
 	</Mesh>
 
 	<Snapshot>
-		<Period frames="100"/>
+		<Period frames="50"/>
 		<Data fileName = "out/snapshot<step>.vtk" stride="1 1" writeTemperature="true" writePhase="true"/>
 	</Snapshot>
 
-	<Task numberOfSteps = "20" timeStep = "500">
+	<Task numberOfSteps = "80" timeStep = "100">
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>

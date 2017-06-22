@@ -3,9 +3,9 @@ cmake_minimum_required (VERSION 2.6)
 project (stefan_enthalpy)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fopenmp")
-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mtune=native -funroll-loops -ffast-math -ftree-vectorize -ftree-vectorizer-verbose=0")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mtune=native -funroll-loops -ffast-math -ftree-vectorize -ftree-vectorizer-verbose=0")
+
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -25,6 +25,13 @@ SET(CMAKE_VERBOSE_MAKEFILE ON)
   message("OpenMP is found\n")
 #endif (OPENMP_FOUND)
 
+
+#find_package(GSL REQUIRED)
+#include_directories(${GSL_INCLUDE_DIRS})
+
+#find_library("./3rdparty/gsl" gsl)
+#target_link_libraries(gsl "./3rdparty/gsl")
+
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/bin)
 MAKE_DIRECTORY(${CMAKE_SOURCE_DIR}/bin)
 
@@ -37,10 +44,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BINDIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BINDIR})
 
 IF (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    SET(BinaryFileName ${PROJECT_NAME}Debug)
+    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -Wall")
+    set(BinaryFileName ${PROJECT_NAME}Debug)
 ENDIF()
 
 IF (${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
     SET(BinaryFileName ${PROJECT_NAME})
 ENDIF()
 
@@ -80,5 +89,9 @@ set(TinyXmlSrc
 )
 
 add_executable (${BinaryFileName} ${sources} ${math} ${utils} ${TinyXmlSrc})
-target_link_libraries (${BinaryFileName})
+#target_link_libraries (${BinaryFileName} ${GSL_LIBRARIES})
+
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_SOURCE_DIR}/3rdparty/gsl -L${CMAKE_SOURCE_DIR}/3rdparty/gsl/ -lgsl -lgslcblas")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${CMAKE_SOURCE_DIR}/3rdparty/gsl/ -lgsl -lgslcblas")
+
 
