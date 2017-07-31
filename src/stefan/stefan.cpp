@@ -50,11 +50,11 @@ void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std
 	if (file.is_open())
 	{
 		int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-		initial_temperatures.reserve(num_of_nodes);
+		initial_temperatures.resize(num_of_nodes);
 		file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
 		file.close();
 	}
-	else 
+	else
 	{
 		std::cerr << "Error: Unable to open initial temperatures file \n";
 		std::exit(EXIT_FAILURE);
