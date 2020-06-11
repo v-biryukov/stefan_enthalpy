@@ -20,6 +20,8 @@ private:
     std::vector<double> current_iteration_data;
     std::vector<double> next_iteration_data;
 
+    std::vector<std::pair<std::vector<int>, double>> fields_of_constant_temperature;
+
     // Boundary conditions
     std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
     const double boundary_condition_eps = 1e-15;
@@ -117,10 +119,22 @@ private:
         Assign(enthalpy_data, next_iteration_data);
     }
 
+    void ApplyConstantTemperatureFields()
+    {
+        for (int field = 0; field < fields_of_constant_temperature.size(); ++field)
+        {
+            double temperature = fields_of_constant_temperature[field].second;
+            for (int id = 0; id < fields_of_constant_temperature[field].first.size(); ++id)
+            {
+                enthalpy_data[id] = mesh.GetMaterialInfo(id).GetEnthalpyByT(temperature);
+            }
+        }
+    }
+
 
     void SetBoundaryConditions(int axis, std::array<int, Dims> index,
-        std::vector<double> & a, std::vector<double> & b,
-        std::vector<double> & c, std::vector<double> & f)
+        std::vector<double>& a, std::vector<double>& b,
+        std::vector<double>& c, std::vector<double>& f)
     {
         int num = mesh.GetNums()[axis];
         double h = mesh.GetSteps()[axis];
@@ -185,7 +199,11 @@ public:
     {
         for (int i = 0; i < Dims; ++i)
             Step(i, dt);
+        ApplyConstantTemperatureFields();
     }
+
+
+
 
     void SaveToVtk(const std::string name, const Settings::SnapshotSettings & snapshot_settings) const
     {

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Settings dimsCount = "3">
+	<Mesh meshFile="meshes/ball3d_128.mesh">
+		<MediumParams>
+			<Submesh index="0" TPhase = "273.0" rhoL = "1000.0" rhoS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
+			<Submesh index="1" TPhase = "273.0" rhoL = "1000.0" rhoS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
+			<Submesh index="2" TPhase = "50.0" rhoL = "1.3" rhoS = "1.3" thermalConductivityL = "0.0243" thermalConductivityS = "0.0243" 
+				specificHeatFusion = "1e9" specificHeatCapacityL = "1005.0" specificHeatCapacityS = "1005.0"/> 
+		</MediumParams>
+
+
+		<Boundaries>
+			<FixedFlux axis = "x" side = "0" flux = "1.0"/>
+			<FixedTemperature axis = "z" side = "0" temperature = "100"/>
+		</Boundaries>
+	</Mesh>
+
+	<Snapshot>
+		<Period frames="50"/>
+		<Data fileName = "out/snapshot<step>.vtk" stride="63 3 4" writeEnthalpy="true" writeTemperature="true" writeThermalElasticity="true" 
+			writeState="true"/>
+	</Snapshot>
+
+	<Task numberOfSteps = "80" timeStep = "100">
+		<IniState> 
+			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
+			<PerSubmesh>
+				<Submesh index="0" temperature="200"/>
+				<Submesh index="1" temperature="300"/>
+			</PerSubmesh>
+		</IniState>
+	</Task>
+</Settings>
