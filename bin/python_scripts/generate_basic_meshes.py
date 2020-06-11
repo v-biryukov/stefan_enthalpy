@@ -1,5 +1,7 @@
 import struct
 import math
+from functools import reduce
+
 
 def generate_zeroes(file_name, nums, lengths):
 	dims = len(nums)
@@ -17,7 +19,7 @@ def generate_half_zeroes_half_ones(file_name, nums, lengths):
 	file = open(file_name, 'wb')
 	file.write(struct.pack("<%ui" % len(nums), *nums))
 	file.write(struct.pack("<%ud" % len(lengths), *lengths))
-	params = [0] * (num_of_nodes/2) + [1] * (num_of_nodes/2)
+	params = [0] * (num_of_nodes//2) + [1] * (num_of_nodes//2)
 	file.write(struct.pack("<%ui" % len(params), *params))
 	file.close()
 
@@ -149,6 +151,7 @@ def generate_linear_temperatures(file_name, nums, axis, start_temperature, finis
 mode = "TEST"
 
 if mode == "TEST":
+
 	generate_zeroes("../meshes/zeroes3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0))
 	generate_linear_temperatures("../meshes/zeroes2d_linear.data", (64, 64), 1, 100, 400)
 	generate_zeroes("../meshes/zeroes2d.mesh", (64, 64), (10.0, 10.0))
