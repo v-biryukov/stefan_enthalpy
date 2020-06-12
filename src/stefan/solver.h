@@ -20,6 +20,7 @@ private:
     std::vector<double> current_iteration_data;
     std::vector<double> next_iteration_data;
 
+    // Fields
     std::vector<std::pair<std::vector<int>, double>> fields_of_constant_temperature;
 
     // Boundary conditions
@@ -183,7 +184,7 @@ public:
 
 
 
-    Solver(Mesh<Dims> & mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double> & temperature_data)
+    Solver(Mesh<Dims>& mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double>& temperature_data)
         : mesh(mesh), boundary_conditions(boundary_conditions)
     {
         enthalpy_data.resize(mesh.GetNumberOfNodes());
@@ -205,7 +206,7 @@ public:
 
 
 
-    void SaveToVtk(const std::string name, const Settings::SnapshotSettings & snapshot_settings) const
+    void SaveToVtk(const std::string name, const Settings::SnapshotSettings& snapshot_settings) const
     {
         std::array<int, Dims> nums = mesh.GetNums();
         std::vector<int> stride = snapshot_settings.stride;
@@ -473,16 +474,16 @@ void Solver<3>::IterateTridiagonal(int axis,
                     {
                         ix = i2; iy = i3; iz = i1;
                     }
-                    const MaterialInfo & mi = mesh.GetMaterialInfo({ix, iy});
-                    const MaterialInfo & min1 = mesh.GetMaterialInfo({ix-ort1x, iy-ort1y, iz-ort1z});
-                    const MaterialInfo & mip1 = mesh.GetMaterialInfo({ix+ort1x, iy+ort1y, iz+ort1z});
-                    const MaterialInfo & min2 = mesh.GetMaterialInfo({ix-ort2x, iy-ort2y, iz-ort2z});
-                    const MaterialInfo & mip2 = mesh.GetMaterialInfo({ix+ort2x, iy+ort2y, iz+ort2z});
-                    const MaterialInfo & min3 = mesh.GetMaterialInfo({ix-ort3x, iy-ort3y, iz-ort3z});
-                    const MaterialInfo & mip3 = mesh.GetMaterialInfo({ix+ort3x, iy+ort3y, iz+ort3z});
+                    const MaterialInfo& mi = mesh.GetMaterialInfo({ix, iy});
+                    const MaterialInfo& min1 = mesh.GetMaterialInfo({ix-ort1x, iy-ort1y, iz-ort1z});
+                    const MaterialInfo& mip1 = mesh.GetMaterialInfo({ix+ort1x, iy+ort1y, iz+ort1z});
+                    const MaterialInfo& min2 = mesh.GetMaterialInfo({ix-ort2x, iy-ort2y, iz-ort2z});
+                    const MaterialInfo& mip2 = mesh.GetMaterialInfo({ix+ort2x, iy+ort2y, iz+ort2z});
+                    const MaterialInfo& min3 = mesh.GetMaterialInfo({ix-ort3x, iy-ort3y, iz-ort3z});
+                    const MaterialInfo& mip3 = mesh.GetMaterialInfo({ix+ort3x, iy+ort3y, iz+ort3z});
 
-                    const double * E_iter = current_iteration_data.data() + mesh.GetGlobalId({ix, iy, iz});
-                    const double * E_step = enthalpy_data.data() + mesh.GetGlobalId({ix, iy, iz});
+                    const double* E_iter = current_iteration_data.data() + mesh.GetGlobalId({ix, iy, iz});
+                    const double* E_step = enthalpy_data.data() + mesh.GetGlobalId({ix, iy, iz});
                     const double central_thermal_conductivity_iter = mi.GetThermalConductivityByE(E_iter[0]);
                     const double central_thermal_conductivity_step = mi.GetThermalConductivityByE(E_step[0]);
                     const double central_T = mi.GetTByEnthalpy(E_step[0]);
