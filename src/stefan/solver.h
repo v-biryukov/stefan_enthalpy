@@ -167,6 +167,53 @@ private:
         f[num-1] = (boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta);
     }
 
+    void InitFields(const Settings& settings)
+    {
+        for (int field = 0; field < settings.mesh_settings.field_settings_info.size(); field++)
+        {
+            std::pair<std::vector<int>, double> tempfield;
+            tempfield.second = settings.mesh_settings.field_settings_info[field].temperature;
+            std::string filename = settings.mesh_settings.field_settings_info[field].field_filename;
+            std::ifstream file(filename, std::ios::in);
+            if (file.is_open())
+            {
+                int num_of_field_nodes;
+                file >> num_of_field_nodes;
+                tempfield.first.resize(num_of_field_nodes);
+                for (int i = 0; i < num_of_field_nodes; i++)
+                {
+                    int node_i, node_j;
+                    file >> node_i >> node_j;
+                    tempfield.first[i] = mesh.GetGlobalId({node_i, node_j});
+                }
+                fields_of_constant_temperature.push_back(tempfield);
+                file.close();
+            }
+            else 
+            {
+                std::cerr << "Error: Unable to open field file " << filename << "\n";
+                std::exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    void ReadInitialStateFile(std::string filename, std::array<int, Dims> nums, std::vector<double>& initial_temperatures)
+    {
+        std::ifstream file (filename, std::ios::binary);
+        if (file.is_open())
+        {
+            int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+            initial_temperatures.resize(num_of_nodes);
+            file.read ((char*)initial_temperatures.data(), num_of_nodes * sizeof(double));
+            file.close();
+        }
+        else
+        {
+            std::cerr << "Error: Unable to open initial temperatures file \n";
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
     const bool isInfoToWrite(int global_id, std::vector<int>& stride) const
     {
         std::array<int, Dims> ids = mesh.GetIds(global_id);
@@ -189,47 +236,61 @@ public:
 
 
 
-    Solver(Mesh<Dims>& mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double>& temperature_data)
+    Solver(Mesh<Dims>& mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double>& initial_temperatures)
         : mesh(mesh), boundary_conditions(boundary_conditions)
     {
         enthalpy_data.resize(mesh.GetNumberOfNodes());
         current_iteration_data.resize(mesh.GetNumberOfNodes());
         next_iteration_data.resize(mesh.GetNumberOfNodes());
-
-        SetEnthalpyByTData(temperature_data);
-        auto nums = mesh.GetNums();
-        auto max_n = *std::max_element(nums.begin(), nums.end());
+        SetEnthalpyByTData(initial_temperatures);
     }
 
-
-    void AddFields(const Settings& settings)
+    Solver(const Settings& settings)
     {
-        for (int field = 0; field < settings.mesh_settings.field_settings_info.size(); field++)
+        // Init Mesh
+        std::vector<MaterialInfo> material_infos;
+        for (auto mi : settings.mesh_settings.medium_params_info)
         {
-            std::pair<std::vector<int>, double> tempfield;
-            tempfield.second = settings.mesh_settings.field_settings_info[field].temperature;
-            std::string filename = settings.mesh_settings.field_settings_info[field].field_filename;
-            std::ifstream file(filename, std::ios::in);
-            if (file.is_open())
-            {
-                int num_of_field_nodes;
-                file >> num_of_field_nodes;
-                tempfield.first.resize(num_of_field_nodes);
-                for (int i = 0; i < num_of_field_nodes; i++)
-                {
-                    int node_i, node_j;
-                    file >> node_i >> node_j;
-                    tempfield.first[i] = mesh.GetGlobalId({node_i, node_j});
-                }
-                file.close();
-            }
-            else 
-            {
-                std::cerr << "Error: Unable to open field file " << filename << "\n";
-                std::exit(EXIT_FAILURE);
-            }
+            material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.density_L, mi.density_S,
+                                                  mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
+                                                  mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
         }
+        mesh = Mesh<Dims>(settings.mesh_settings.mesh_file, material_infos);
+
+        // Init Boundary conditions
+        for (int i = 0; i < boundary_conditions.size(); ++i)
+            boundary_conditions[i] = settings.mesh_settings.boundary_settings_info[i].params;
+
+
+        // Init initial temperatures
+        std::vector<double> initial_temperatures;
+        if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
+        {
+            ReadInitialStateFile(settings.task_settings.initial_state_settings.initial_state_data_file, mesh.GetNums(), initial_temperatures);
+        }
+        else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
+        {
+            for (int i = 0; i < mesh.GetNumberOfNodes(); i++)
+                initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[mesh.GetMaterialIndex(i)]);
+        }
+
+        enthalpy_data.resize(mesh.GetNumberOfNodes());
+        current_iteration_data.resize(mesh.GetNumberOfNodes());
+        next_iteration_data.resize(mesh.GetNumberOfNodes());
+        SetEnthalpyByTData(initial_temperatures);
+
+        // Init Fields
+        InitFields(settings);
+        ApplyConstantTemperatureFields();
     }
+
+
+
+
+
+
+
+    
 
     void Step(double dt)
     {

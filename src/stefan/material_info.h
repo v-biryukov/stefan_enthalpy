@@ -4,16 +4,16 @@
 struct MaterialInfo
 {
     // material melts from T1 to T2; T1~T2
-    const double T1;
-    const double T2;
+    double T1;
+    double T2;
 
-    const double density_L;
-    const double density_S;
-    const double thermal_conductivity_L;
-    const double thermal_conductivity_S;
-    const double specific_heat_fusion;
-    const double specific_heat_capacity_L;
-    const double specific_heat_capacity_S;
+    double density_L;
+    double density_S;
+    double thermal_conductivity_L;
+    double thermal_conductivity_S;
+    double specific_heat_fusion;
+    double specific_heat_capacity_L;
+    double specific_heat_capacity_S;
 
     MaterialInfo()
         : T1(0.0), T2(0.0), density_L(0.0), density_S(0.0), thermal_conductivity_L(0.0), thermal_conductivity_S(0.0),
