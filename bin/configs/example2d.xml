@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Settings dimsCount = "2">
-	<Mesh meshFile="meshes/ball2d_512.bmesh">
+	<Mesh meshFile="meshes/ball2d_512.tmesh">
 		<MediumParams>
 			<Submesh index="0" TPhase = "273.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0" /> 
@@ -16,9 +16,8 @@
 			<FixedTemperature axis = "y" side = "0" temperature = "0"/>
 		</Boundaries>
 
-
 		<Fields>
-			<FixedTemperature fieldFile = "mesh/fball2d_512.field" temperature = "100"/>
+			<FixedTemperature fieldFile="meshes/ball2d_512.tfield" temperature = "123"/>
 		</Fields>
 	</Mesh>
 

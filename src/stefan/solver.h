@@ -27,6 +27,11 @@ private:
     std::array<std::array<double, 3>, 2 * Dims> boundary_conditions;
     const double boundary_condition_eps = 1e-15;
 
+
+
+
+
+
     void SetEnthalpyByTData(const std::vector<double>& temperature_data)
     {
         for (int i = 0; i < mesh.GetNumberOfNodes(); ++i)
@@ -194,6 +199,36 @@ public:
         SetEnthalpyByTData(temperature_data);
         auto nums = mesh.GetNums();
         auto max_n = *std::max_element(nums.begin(), nums.end());
+    }
+
+
+    void AddFields(const Settings& settings)
+    {
+        for (int field = 0; field < settings.mesh_settings.field_settings_info.size(); field++)
+        {
+            std::pair<std::vector<int>, double> tempfield;
+            tempfield.second = settings.mesh_settings.field_settings_info[field].temperature;
+            std::string filename = settings.mesh_settings.field_settings_info[field].field_filename;
+            std::ifstream file(filename, std::ios::in);
+            if (file.is_open())
+            {
+                int num_of_field_nodes;
+                file >> num_of_field_nodes;
+                tempfield.first.resize(num_of_field_nodes);
+                for (int i = 0; i < num_of_field_nodes; i++)
+                {
+                    int node_i, node_j;
+                    file >> node_i >> node_j;
+                    tempfield.first[i] = mesh.GetGlobalId({node_i, node_j});
+                }
+                file.close();
+            }
+            else 
+            {
+                std::cerr << "Error: Unable to open field file " << filename << "\n";
+                std::exit(EXIT_FAILURE);
+            }
+        }
     }
 
     void Step(double dt)

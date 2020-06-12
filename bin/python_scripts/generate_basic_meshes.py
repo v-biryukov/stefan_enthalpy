@@ -75,8 +75,6 @@ def generate_box_3d(file_name, nums, lengths, size):
 
 
 def generate_ball_2d(file_name, nums, lengths, size):
-	dims = len(nums)
-	num_of_nodes = reduce(lambda x, y: x*y, nums)
 	file = open(file_name, 'wb')
 	file.write(struct.pack("<%ui" % len(nums), *nums))
 	file.write(struct.pack("<%ud" % len(lengths), *lengths))
@@ -97,10 +95,37 @@ def generate_ball_2d(file_name, nums, lengths, size):
 	file.close()
 
 
+def generate_ball_2d_ascii(file_name, nums, lengths, size):
+	file = open(file_name, 'w')
+	file.write(str(nums[0]) + " " + str(nums[1]) + "\n")
+	file.write(str(lengths[0]) + " " + str(lengths[1]) + "\n")
+
+	center_x = lengths[0] / 2.0
+	center_y = lengths[1] / 2.0
+	for i in range(nums[0]):
+		for j in range(nums[1]):
+			x = i * lengths[0] / nums[0] - center_x
+			y = j * lengths[1] / nums[1] - center_y
+			if x*x + y*y < size*size/4:
+				file.write("1 ")
+			else:
+				file.write("0 ")
+		file.write("\n")
+	file.close()
+
+
+def generate_ball_field_2d(file_name, nums, lengths, size):
+	file = open(file_name, 'w')
+	for i in range(nums[0]):
+		for j in range(nums[1]):
+			x = i * lengths[0] / nums[0]
+			y = j * lengths[1] / nums[1]
+			if y < 3:
+				file.write(str(i) + " " + str(j) + "\n")
+	file.close()
+
 
 def generate_ball_3d(file_name, nums, lengths, size):
-	dims = len(nums)
-	num_of_nodes = reduce(lambda x, y: x*y, nums)
 	file = open(file_name, 'wb')
 	file.write(struct.pack("<%ui" % len(nums), *nums))
 	file.write(struct.pack("<%ud" % len(lengths), *lengths))
@@ -151,21 +176,12 @@ def generate_linear_temperatures(file_name, nums, axis, start_temperature, finis
 mode = "TEST"
 
 if mode == "TEST":
+	generate_ball_2d_ascii("../meshes/ball2d_512.tmesh", (512, 512), (10.0, 10.0), 4.0)
+	generate_ball_field_2d("../meshes/ball2d_512.tfield", (512, 512), (10.0, 10.0), 4.0)
+	
 
-	generate_zeroes("../meshes/zeroes3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0))
-	generate_linear_temperatures("../meshes/zeroes2d_linear.data", (64, 64), 1, 100, 400)
-	generate_zeroes("../meshes/zeroes2d.mesh", (64, 64), (10.0, 10.0))
-
-	generate_half_zeroes_half_ones("../meshes/half3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0))
-	generate_half_zeroes_half_ones("../meshes/half2d.mesh", (64, 64), (10.0, 10.0))
-
-	generate_box_2d("../meshes/box2d_512.mesh", (512, 512), (10.0, 10.0), 4.0)
-	generate_box_3d("../meshes/box3d.mesh", (32, 32, 32), (10.0, 10.0, 10.0), 4.0)
-
-	generate_ball_2d("../meshes/ball2d_512.mesh", (512, 512), (10.0, 10.0), 4.0)
-	generate_ball_2d("../meshes/ball2d_1024.mesh", (1024, 1024), (10.0, 10.0), 4.0)
-
-	generate_ball_3d("../meshes/ball3d_128.mesh", (128, 128, 128), (10.0, 10.0, 10.0), 4.0)
-	generate_ball_3d("../meshes/ball3d_256.mesh", (256, 256, 256), (10.0, 10.0, 10.0), 4.0)
+	#generate_ball_2d("../meshes/ball2d_1024.bmesh", (1024, 1024), (10.0, 10.0), 4.0)
+	#generate_ball_3d("../meshes/ball3d_128.bmesh", (128, 128, 128), (10.0, 10.0, 10.0), 4.0)
+	#generate_ball_3d("../meshes/ball3d_256.bmesh", (256, 256, 256), (10.0, 10.0, 10.0), 4.0)
 
 

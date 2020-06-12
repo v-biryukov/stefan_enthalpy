@@ -38,6 +38,14 @@ struct Settings
             std::array<double, 3> params;
         };
         std::vector<BoundarySettings> boundary_settings_info;
+
+        struct FieldSettings
+        {
+            std::string field_filename;
+            double temperature;
+        };
+        std::vector<FieldSettings> field_settings_info;
+
     } mesh_settings;
 
     struct SnapshotSettings
@@ -198,11 +206,12 @@ void ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis)
 void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
 {
     ParseString(mesh_info_element, "meshFile", &settings.mesh_settings.mesh_file);
+
     TiXmlElement* medium_params_element = mesh_info_element->FirstChildElement("MediumParams");
     if (medium_params_element)
     {
 
-        TiXmlElement * submesh_element = medium_params_element->FirstChildElement("Submesh");
+        TiXmlElement* submesh_element = medium_params_element->FirstChildElement("Submesh");
         while (submesh_element)
         {
             int index;
@@ -269,6 +278,20 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
             temp_boundary_setings.params = {1, 0, temperature};
             settings.mesh_settings.boundary_settings_info[2*temp_boundary_setings.axis + temp_boundary_setings.side] = temp_boundary_setings;
             fixedtemperature_boundaries_element = fixedtemperature_boundaries_element->NextSiblingElement("FixedTemperature");
+        }
+    }
+
+    TiXmlElement* fields_element = mesh_info_element->FirstChildElement("Fields");
+    if (fields_element)
+    {
+        TiXmlElement* fixedtemperature_element = fields_element->FirstChildElement("FixedTemperature");
+        while (fixedtemperature_element)
+        {
+            settings.mesh_settings.field_settings_info.push_back(Settings::MeshSettings::FieldSettings());
+            int size = settings.mesh_settings.field_settings_info.size();
+            ParseScalar(fixedtemperature_element, "temperature", &settings.mesh_settings.field_settings_info[size - 1].temperature);
+            ParseString(fixedtemperature_element, "fieldFile", &settings.mesh_settings.field_settings_info[size - 1].field_filename);
+            fixedtemperature_element = fixedtemperature_element->NextSiblingElement("FixedTemperature");
         }
     }
 }

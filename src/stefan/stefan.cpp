@@ -21,111 +21,6 @@ void PrintHelpInfo()
     std::cout << "Help info" << std::endl;
 }
 
-
-template <int Dims>
-void ReadMeshFileAscii(std::string filename, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    std::ifstream file(filename, std::ios::in);
-    if (file.is_open())
-    {
-        for (int d = 0; d < Dims; d++)
-        {
-            file >> nums[d];
-        }
-        for (int d = 0; d < Dims; d++)
-        {
-            file >> lengths[d];
-        }
-        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-        material_indexes.resize(num_of_nodes);
-        for (int i = 0; i < num_of_nodes; i++)
-        {
-            file >> material_indexes[i];
-        }
-        file.close();
-    }
-    else 
-    {
-        std::cerr << "Error: Unable to open ascii mesh file " << filename << "\n";
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-template <int Dims>
-void ReadMeshFileBinary(std::string filename, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    std::ifstream file(filename, std::ios::binary);
-    if (file.is_open())
-    {
-        file.read((char*)nums.data(), Dims * sizeof(int));
-        file.read((char*)lengths.data(), Dims * sizeof(double));
-        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-        material_indexes.resize(num_of_nodes);
-        file.read((char*)material_indexes.data(), num_of_nodes * sizeof(int));
-        file.close();
-    }
-    else 
-    {
-        std::cerr << "Error: Unable to open binary mesh file " << filename << "\n";
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-bool EndsWith(const std::string& fullString, const std::string& ending) 
-{
-    if (fullString.length() >= ending.length()) 
-    {
-        return (0 == fullString.compare(fullString.length() - ending.length(), ending.length(), ending));
-    } 
-    else 
-    {
-        return false;
-    }
-}
-
-template <int Dims>
-void ReadMeshFile(std::string filename, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    if (EndsWith(filename, ".tmesh"))
-    {
-        ReadMeshFileAscii<Dims>(filename, nums, lengths, material_indexes);
-    }
-    else if (EndsWith(filename, ".bmesh"))
-    {
-        ReadMeshFileBinary<Dims>(filename, nums, lengths, material_indexes);
-    }
-    else
-    {
-        std::cerr << "Error: Mesh file" << filename << " has wrong extension\n";
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-
-template <int Dims>
-void ReadMeshFileOld(std::string filename, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    std::ifstream file(filename, std::ios::binary);
-    if (file.is_open())
-    {
-        file.read((char*)nums.data(), Dims * sizeof(int));
-        file.read((char*)lengths.data(), Dims * sizeof(double));
-        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-        material_indexes.resize(num_of_nodes);
-        file.read((char*)material_indexes.data(), num_of_nodes * sizeof(int));
-        file.close();
-    }
-    else 
-    {
-        std::cerr << "Error: Unable to open mesh file \n";
-        std::exit(EXIT_FAILURE);
-    }
-}
-
 template <int Dims>
 void ReadInitialStateFile(std::string filename, std::array<int, Dims> nums, std::vector<double>& initial_temperatures)
 {
@@ -147,11 +42,6 @@ void ReadInitialStateFile(std::string filename, std::array<int, Dims> nums, std:
 template <int Dims>
 int Run(const Settings& settings)
 {
-    std::array<int, Dims> nums;
-    std::array<double, Dims> lengths;
-    std::vector<int> material_indexes;
-    ReadMeshFile<Dims>(settings.mesh_settings.mesh_file, nums, lengths, material_indexes);
-
     std::vector<MaterialInfo> material_infos;
     for (auto mi : settings.mesh_settings.medium_params_info)
     {
@@ -160,17 +50,17 @@ int Run(const Settings& settings)
                                               mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
     }
 
-    Mesh<Dims> mesh = Mesh<Dims>(nums, lengths, material_infos, material_indexes);
+    Mesh<Dims> mesh = Mesh<Dims>(settings.mesh_settings.mesh_file, material_infos);
 
     std::vector<double> initial_temperatures;
     if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
     {
-        ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, nums, initial_temperatures);
+        ReadInitialStateFile<Dims>(settings.task_settings.initial_state_settings.initial_state_data_file, mesh.GetNums(), initial_temperatures);
     }
     else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
     {
-        for (auto el : material_indexes)
-            initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[el]);
+        for (int i = 0; i < mesh.GetNumberOfNodes(); i++)
+            initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[mesh.GetMaterialIndex(i)]);
     }
 
     std::array<std::array<double, 3>, 2*Dims> boundary_conditions;
@@ -178,6 +68,7 @@ int Run(const Settings& settings)
         boundary_conditions[i] = settings.mesh_settings.boundary_settings_info[i].params;
 
     Solver<Dims> sol = Solver<Dims>(mesh, boundary_conditions, initial_temperatures);
+    sol.AddFields(settings);
     for (int time_step_num = 0; time_step_num < settings.task_settings.number_of_steps; ++time_step_num)
     {
         if (time_step_num % settings.snapshot_settings_info.period_frames == 0)
