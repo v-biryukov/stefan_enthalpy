@@ -23,73 +23,93 @@ void PrintHelpInfo()
 
 
 template <int Dims>
-void ReadMeshFileAscii(std::ifstream& file, std::array<int, Dims>& nums, 
+void ReadMeshFileAscii(std::string filename, std::array<int, Dims>& nums, 
     std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
 {
-    for (int d = 0; d < Dims; d++)
-    {
-        file >> nums[d];
-    }
-    for (int d = 0; d < Dims; d++)
-    {
-        file >> lengths[d];
-    }
-    int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-    material_indexes.resize(num_of_nodes);
-    for (int i = 0; i < num_of_nodes; i++)
-    {
-        file >> material_indexes[i];
-    }
-}
-
-template <int Dims>
-void ReadMeshFileBinary(std::ifstream& file, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    file.read((char*)nums.data(), Dims * sizeof(int));
-    file.read((char*)lengths.data(), Dims * sizeof(double));
-    int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
-    material_indexes.resize(num_of_nodes);
-    file.read((char*)material_indexes.data(), num_of_nodes * sizeof(int));
-}
-
-template <int Dims>
-void ReadMeshFile(std::string file_name, std::array<int, Dims>& nums, 
-    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
-{
-    std::ifstream file(file_name, std::ios::binary);
+    std::ifstream file(filename, std::ios::in);
     if (file.is_open())
     {
-        std::string file_type;
-        file >> file_type;
-        if (file_type == "ASCII")
+        for (int d = 0; d < Dims; d++)
         {
-            ReadMeshFileAscii<Dims>(file, nums, lengths, material_indexes);
+            file >> nums[d];
         }
-        else if (file_type == "BINARY")
+        for (int d = 0; d < Dims; d++)
         {
-            ReadMeshFileBinary<Dims>(file, nums, lengths, material_indexes);
+            file >> lengths[d];
         }
-        else
+        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+        material_indexes.resize(num_of_nodes);
+        for (int i = 0; i < num_of_nodes; i++)
         {
-            std::cerr << "Error: File " << file_name << " opened, but it has a wrong format\n";
-            std::exit(EXIT_FAILURE);
+            file >> material_indexes[i];
         }
         file.close();
     }
     else 
     {
-        std::cerr << "Error: Unable to open mesh file " << file_name << "\n";
+        std::cerr << "Error: Unable to open ascii mesh file " << filename << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+template <int Dims>
+void ReadMeshFileBinary(std::string filename, std::array<int, Dims>& nums, 
+    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (file.is_open())
+    {
+        file.read((char*)nums.data(), Dims * sizeof(int));
+        file.read((char*)lengths.data(), Dims * sizeof(double));
+        int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+        material_indexes.resize(num_of_nodes);
+        file.read((char*)material_indexes.data(), num_of_nodes * sizeof(int));
+        file.close();
+    }
+    else 
+    {
+        std::cerr << "Error: Unable to open binary mesh file " << filename << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+bool EndsWith(const std::string& fullString, const std::string& ending) 
+{
+    if (fullString.length() >= ending.length()) 
+    {
+        return (0 == fullString.compare(fullString.length() - ending.length(), ending.length(), ending));
+    } 
+    else 
+    {
+        return false;
+    }
+}
+
+template <int Dims>
+void ReadMeshFile(std::string filename, std::array<int, Dims>& nums, 
+    std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
+{
+    if (EndsWith(filename, ".tmesh"))
+    {
+        ReadMeshFileAscii<Dims>(filename, nums, lengths, material_indexes);
+    }
+    else if (EndsWith(filename, ".bmesh"))
+    {
+        ReadMeshFileBinary<Dims>(filename, nums, lengths, material_indexes);
+    }
+    else
+    {
+        std::cerr << "Error: Mesh file" << filename << " has wrong extension\n";
         std::exit(EXIT_FAILURE);
     }
 }
 
 
 template <int Dims>
-void ReadMeshFile2(std::string file_name, std::array<int, Dims>& nums, 
+void ReadMeshFileOld(std::string filename, std::array<int, Dims>& nums, 
     std::array<double, Dims>& lengths, std::vector<int>& material_indexes)
 {
-    std::ifstream file(file_name, std::ios::binary);
+    std::ifstream file(filename, std::ios::binary);
     if (file.is_open())
     {
         file.read((char*)nums.data(), Dims * sizeof(int));
@@ -107,9 +127,9 @@ void ReadMeshFile2(std::string file_name, std::array<int, Dims>& nums,
 }
 
 template <int Dims>
-void ReadInitialStateFile(std::string file_name, std::array<int, Dims> nums, std::vector<double>& initial_temperatures)
+void ReadInitialStateFile(std::string filename, std::array<int, Dims> nums, std::vector<double>& initial_temperatures)
 {
-    std::ifstream file (file_name, std::ios::binary);
+    std::ifstream file (filename, std::ios::binary);
     if (file.is_open())
     {
         int num_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
