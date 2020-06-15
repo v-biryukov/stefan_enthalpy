@@ -130,8 +130,9 @@ private:
         for (int field = 0; field < fields_of_constant_temperature.size(); ++field)
         {
             double temperature = fields_of_constant_temperature[field].second;
-            for (int id = 0; id < fields_of_constant_temperature[field].first.size(); ++id)
+            for (int i = 0; i < fields_of_constant_temperature[field].first.size(); ++i)
             {
+                int id = fields_of_constant_temperature[field].first[i];
                 enthalpy_data[id] = mesh.GetMaterialInfo(id).GetEnthalpyByT(temperature);
             }
         }

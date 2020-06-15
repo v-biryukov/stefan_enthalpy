@@ -18,29 +18,29 @@
 
 
 		<Boundaries>
-			<FixedFlux axis = "x" side = "0" flux = "1.0"/>
-			<FixedTemperature axis = "y" side = "0" temperature = "0"/>
+			<FixedFlux axis = "x" side = "0" flux = "0.0"/>
 		</Boundaries>
 
 		<Fields>
-			<FixedTemperature fieldFile="meshes/ice_island2d_water.tfield" temperature = "2000"/>
+			<FixedTemperature fieldFile="meshes/ice_island2d_water.tfield" temperature = "280"/>
+			<FixedTemperature fieldFile="meshes/ice_island2d_air.tfield" temperature = "290"/>
 		</Fields>
 	</Mesh>
 
 	<Snapshot>
-		<Period frames="50"/>
+		<Period frames="200"/>
 		<Data fileName = "out/snapshot_iceisland<step>.vtk" stride="1 1" writeEnthalpy="true" writeTemperature="true" writeThermalElasticity="true" 
 			writeState="true"/>
 	</Snapshot>
 
-	<Task numberOfSteps = "10001" timeStep = "100">
+	<Task numberOfSteps = "50001" timeStep = "1000">
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>
-				<Submesh index="0" temperature="270"/>
-				<Submesh index="1" temperature="275"/>
-				<Submesh index="2" temperature="272"/>
-				<Submesh index="3" temperature="280"/>
+				<Submesh index="0" temperature="280"/>
+				<Submesh index="1" temperature="280"/>
+				<Submesh index="2" temperature="270"/>
+				<Submesh index="3" temperature="290"/>
 			</PerSubmesh>
 		</IniState>
 	</Task>
