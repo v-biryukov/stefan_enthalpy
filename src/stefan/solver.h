@@ -9,6 +9,7 @@
 #include "mesh.h"
 #include "material_info.h"
 #include "settings_parser.h"
+#include "submesh_effects.h"
 
 template <int Dims>
 class Solver
@@ -28,9 +29,8 @@ private:
     const double boundary_condition_eps = 1e-15;
 
 
-
-
-
+    // Submeshes
+    std::vector<std::vector<SubmeshEffect*>> submesh_effects;
 
     void SetEnthalpyByTData(const std::vector<double>& temperature_data)
     {
@@ -136,6 +136,11 @@ private:
                 enthalpy_data[id] = mesh.GetMaterialInfo(id).GetEnthalpyByT(temperature);
             }
         }
+    }
+
+    void ApplyEffects()
+    {
+        
     }
 
 
@@ -250,11 +255,13 @@ public:
     {
         // Init Mesh
         std::vector<MaterialInfo> material_infos;
-        for (auto mi : settings.mesh_settings.medium_params_info)
+        for (auto sm : settings.mesh_settings.submesh_settings_info)
         {
-            material_infos.push_back(MaterialInfo(mi.T_phase, mi.T_phase, mi.density_L, mi.density_S,
-                                                  mi.thermal_conductivity_L, mi.thermal_conductivity_S, 
-                                                  mi.specific_heat_fusion, mi.specific_heat_capacity_L, mi.specific_heat_capacity_S));
+            material_infos.push_back(MaterialInfo(sm.T_phase, sm.T_phase, sm.density_L, sm.density_S,
+                                                  sm.thermal_conductivity_L, sm.thermal_conductivity_S, 
+                                                  sm.specific_heat_fusion, sm.specific_heat_capacity_L, sm.specific_heat_capacity_S));
+
+            submesh_effects.push_back(sm.effects_info);
         }
         mesh = Mesh<Dims>(settings.mesh_settings.mesh_file, material_infos);
 
@@ -379,6 +386,19 @@ public:
             }
         }
         vtk_file.close();
+    }
+
+
+    ~Solver()
+    {
+        for (auto effect_vector : submesh_effects)
+        {
+            for (SubmeshEffect* effect : effect_vector)
+            {
+                delete effect;
+            }
+        }
+        
     }
 
 };

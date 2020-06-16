@@ -9,6 +9,10 @@
 #include "../../3rdparty/tinyxml/tinyxml.h"
 #include "../../3rdparty/tinyxml/tinystr.h"
 
+#include "submesh_effects.h"
+
+
+
 struct Settings
 {
     int dims_count;
@@ -16,23 +20,33 @@ struct Settings
     {
         std::string mesh_file;
 
-        struct MediumParams
+        struct SubmeshSettings
         {
             double T_phase, density_L, density_S;
             double thermal_conductivity_L, thermal_conductivity_S;
             double specific_heat_fusion, specific_heat_capacity_L, specific_heat_capacity_S;
+            
+            std::vector<SubmeshEffect*> effects_info;
+
+            ~SubmeshSettings()
+            {
+                for (auto effect : effects_info)
+                {
+                    delete effect;
+                }
+            }
         };
-        std::vector<MediumParams> medium_params_info;
+        std::vector<SubmeshSettings> submesh_settings_info;
         
         struct BoundarySettings
         {
-            enum BoundarySettingTypes
+            enum class BoundaryType
             {
                 Custom,
                 FixedFlux,
                 FixedTemperature
             };
-            BoundarySettingTypes type;
+            BoundaryType type;
             int axis;
             int side;
             std::array<double, 3> params;
@@ -203,6 +217,41 @@ void ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis)
     }
 }
 
+
+void ParseSubmeshInfo(TiXmlElement* submesh_element, Settings& settings)
+{
+    Settings::MeshSettings::SubmeshSettings temp_medium_params;
+    ParseScalar(submesh_element, "TPhase", &(temp_medium_params.T_phase));
+    ParseScalar(submesh_element, "densityL", &(temp_medium_params.density_L));
+    ParseScalar(submesh_element, "densityS", &(temp_medium_params.density_S));
+    ParseScalar(submesh_element, "thermalConductivityL", &(temp_medium_params.thermal_conductivity_L));
+    ParseScalar(submesh_element, "thermalConductivityS", &(temp_medium_params.thermal_conductivity_S));
+    ParseScalar(submesh_element, "specificHeatFusion", &(temp_medium_params.specific_heat_fusion));
+    ParseScalar(submesh_element, "specificHeatCapacityL", &(temp_medium_params.specific_heat_capacity_L));
+    ParseScalar(submesh_element, "specificHeatCapacityS", &(temp_medium_params.specific_heat_capacity_S));
+
+    TiXmlElement* effect_element = submesh_element->FirstChildElement("Effects");
+    if (effect_element)
+    {
+        TiXmlElement* fixed_temperature_effect_element = effect_element->FirstChildElement("FixedTemperature");
+        if (fixed_temperature_effect_element)
+        {
+            auto effect = new FixedTemperatureEffect();
+            ParseScalar(fixed_temperature_effect_element, "temperature", &(effect->temperature));
+            temp_medium_params.effects_info.push_back(effect);
+        }
+
+        TiXmlElement* change_index_on_melting_effect_element = effect_element->FirstChildElement("ChangeIndexOnMelting");
+        if (change_index_on_melting_effect_element)
+        {
+            auto effect = new ChangeIndexOnMeltingEffect();
+            ParseUnsigned(change_index_on_melting_effect_element, "index", &(effect->index));
+            temp_medium_params.effects_info.push_back(effect);
+        }
+    }
+    settings.mesh_settings.submesh_settings_info.push_back(temp_medium_params);
+}
+
 void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
 {
     ParseString(mesh_info_element, "meshFile", &settings.mesh_settings.mesh_file);
@@ -215,16 +264,7 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         while (submesh_element)
         {
             int index;
-            Settings::MeshSettings::MediumParams temp_medium_params;
-            ParseScalar(submesh_element, "TPhase", &(temp_medium_params.T_phase));
-            ParseScalar(submesh_element, "densityL", &(temp_medium_params.density_L));
-            ParseScalar(submesh_element, "densityS", &(temp_medium_params.density_S));
-            ParseScalar(submesh_element, "thermalConductivityL", &(temp_medium_params.thermal_conductivity_L));
-            ParseScalar(submesh_element, "thermalConductivityS", &(temp_medium_params.thermal_conductivity_S));
-            ParseScalar(submesh_element, "specificHeatFusion", &(temp_medium_params.specific_heat_fusion));
-            ParseScalar(submesh_element, "specificHeatCapacityL", &(temp_medium_params.specific_heat_capacity_L));
-            ParseScalar(submesh_element, "specificHeatCapacityS", &(temp_medium_params.specific_heat_capacity_S));
-            settings.mesh_settings.medium_params_info.push_back(temp_medium_params);
+            ParseSubmeshInfo(submesh_element, settings);
             submesh_element = submesh_element->NextSiblingElement("Submesh");
         };
     }
@@ -243,7 +283,7 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         while (custom_boundaries_element)
         {
                 Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-                temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::Custom;
+                temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::Custom;
                 ParseBoundaryAxis(custom_boundaries_element, temp_boundary_setings.axis);
                 ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
                 std::vector<double> temp_vector;
@@ -257,7 +297,7 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         while (fixedflux_boundaries_element)
         {
             Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::FixedFlux;
+            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::FixedFlux;
             ParseBoundaryAxis(fixedflux_boundaries_element, temp_boundary_setings.axis);
             ParseUnsigned(fixedflux_boundaries_element, "side", &temp_boundary_setings.side);
             double flux;
@@ -270,7 +310,7 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         while (fixedtemperature_boundaries_element)
         {
             Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundarySettingTypes::FixedTemperature;
+            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::FixedTemperature;
             ParseBoundaryAxis(fixedtemperature_boundaries_element, temp_boundary_setings.axis);
             ParseUnsigned(fixedtemperature_boundaries_element, "side", &temp_boundary_setings.side);
             double temperature;
@@ -335,8 +375,6 @@ void ParseTaskInfo(TiXmlElement* task_info_element, Settings& settings)
         TiXmlElement * submesh_element = ini_state_per_submesh_element->FirstChildElement("Submesh");
         while (submesh_element)
         {
-            int index;
-            Settings::MeshSettings::MediumParams temp_medium_params;
             double temp_temperature;
             ParseScalar(submesh_element, "temperature", &(temp_temperature));
             settings.task_settings.initial_state_settings.initial_temperatures_by_submesh.push_back(temp_temperature);

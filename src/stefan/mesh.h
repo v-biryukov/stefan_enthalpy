@@ -30,6 +30,16 @@ private:
     std::vector<MaterialInfo> material_infos;
     std::vector<int> material_indexes;
 
+    int number_of_submeshes;
+
+    void CalculateNumberOfSubmeshes()
+    {
+        std::set<int> submeshTypes;
+        for (int index : material_indexes)
+            submeshTypes.insert(index);
+        number_of_submeshes = submeshTypes.size();
+    }
+
 public:
 
     Mesh() = default;
@@ -40,12 +50,15 @@ public:
         for (int i = 0; i < Dims; ++i)
             steps[i] = lengths[i] / (nums[i] - 1);
         number_of_nodes = std::accumulate(nums.begin(), nums.end(), 1, std::multiplies<int>());
+
+        CalculateNumberOfSubmeshes();
     }
 
     Mesh(std::string mesh_file, const std::vector<MaterialInfo>& material_infos)
         : material_infos(material_infos)
     {
         ReadMeshFile(mesh_file);
+        CalculateNumberOfSubmeshes();
     }
 
     std::array<int, Dims> GetIds(int global_id) const;
@@ -75,6 +88,7 @@ public:
     inline std::array<double, Dims> GetSteps() const {return steps;}
     inline std::array<int, Dims> GetNums() const {return nums;}
     inline int GetNumberOfNodes() const {return number_of_nodes;}
+    inline int GetNumberOfSubmeshes() const {return number_of_submeshes;}
 
 
     void ReadMeshFileAscii(std::string filename);
