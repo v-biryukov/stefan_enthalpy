@@ -276,11 +276,30 @@ void Settings<Dims>::ParseSubmeshInfo(TiXmlElement* submesh_element, Settings<Di
             temp_medium_params.effects_info.push_back(effect);
         }
 
+        TiXmlElement* sine_temperature_effect_element = effect_element->FirstChildElement("SineTemperature");
+        if (sine_temperature_effect_element)
+        {
+            auto effect = new SineTemperatureEffect<Dims>();
+            ParseScalar(sine_temperature_effect_element, "average", &(effect->average));
+            ParseScalar(sine_temperature_effect_element, "amplitude", &(effect->amplitude));
+            ParseScalar(sine_temperature_effect_element, "period", &(effect->period));
+            ParseScalar(sine_temperature_effect_element, "phaseShift", &(effect->phase_shift));
+            temp_medium_params.effects_info.push_back(effect);
+        }
+
         TiXmlElement* change_index_on_melting_effect_element = effect_element->FirstChildElement("ChangeIndexOnMelting");
         if (change_index_on_melting_effect_element)
         {
             auto effect = new ChangeIndexOnMeltingEffect<Dims>();
             ParseUnsigned(change_index_on_melting_effect_element, "newIndex", &(effect->index));
+            temp_medium_params.effects_info.push_back(effect);
+        }
+
+        TiXmlElement* change_index_on_freezing_effect_element = effect_element->FirstChildElement("ChangeIndexOnFreezing");
+        if (change_index_on_freezing_effect_element)
+        {
+            auto effect = new ChangeIndexOnFreezingEffect<Dims>();
+            ParseUnsigned(change_index_on_freezing_effect_element, "newIndex", &(effect->index));
             temp_medium_params.effects_info.push_back(effect);
         }
     }

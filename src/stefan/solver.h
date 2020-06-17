@@ -16,6 +16,7 @@ class Solver
 {
 private:
     Mesh<Dims> mesh;
+    double time;
 
     std::vector<double> enthalpy_data;
     std::vector<double> current_iteration_data;
@@ -112,18 +113,7 @@ private:
         std::copy_n(from.begin(), to.size(), to.begin());
     }
 
-    void Step(int axis, double dt)
-    {
-        double Linf_norm = 1.0;
-        Assign(next_iteration_data, enthalpy_data);
-        while (Linf_norm > 1e-3)
-        {
-            Assign(current_iteration_data, next_iteration_data);
-            IterateTridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
-            Linf_norm = CalculateLinfNorm(current_iteration_data, next_iteration_data) / CalculateLinfNorm(current_iteration_data);
-        }
-        Assign(enthalpy_data, next_iteration_data);
-    }
+    
 
     void ApplyConstantTemperatureFields()
     {
@@ -148,6 +138,20 @@ private:
                 effect->ApplyEffect(*this, id);
             }
         }
+    }
+
+    void Step(int axis, double dt)
+    {
+        double Linf_norm = 1.0;
+        Assign(next_iteration_data, enthalpy_data);
+        if (Linf_norm > 1e-3)
+        {
+            Assign(current_iteration_data, next_iteration_data);
+            IterateTridiagonal(axis, enthalpy_data, current_iteration_data, next_iteration_data, dt);
+            Linf_norm = CalculateLinfNorm(current_iteration_data, next_iteration_data) / CalculateLinfNorm(current_iteration_data);
+            
+        }
+        Assign(enthalpy_data, next_iteration_data);
     }
 
 
@@ -250,7 +254,7 @@ public:
 
 
     Solver(Mesh<Dims>& mesh, std::array<std::array<double, 3>, 2*Dims> boundary_conditions, const std::vector<double>& initial_temperatures)
-        : mesh(mesh), boundary_conditions(boundary_conditions)
+        : mesh(mesh), boundary_conditions(boundary_conditions), time(0.0)
     {
         enthalpy_data.resize(mesh.GetNumberOfNodes());
         current_iteration_data.resize(mesh.GetNumberOfNodes());
@@ -258,7 +262,7 @@ public:
         SetEnthalpyByTData(initial_temperatures);
     }
 
-    Solver(const Settings<Dims>& settings)
+    Solver(const Settings<Dims>& settings) : time(0.0)
     {
         // Init Mesh
         std::vector<MaterialInfo> material_infos;
@@ -293,10 +297,8 @@ public:
         current_iteration_data.resize(mesh.GetNumberOfNodes());
         next_iteration_data.resize(mesh.GetNumberOfNodes());
         SetEnthalpyByTData(initial_temperatures);
-
-        // Init Fields
-        InitFields(settings);
-        ApplyConstantTemperatureFields();
+        
+        ApplyEffects();
     }
 
 
@@ -309,9 +311,11 @@ public:
     void Step(double dt)
     {
         for (int i = 0; i < Dims; ++i)
+        {
             Step(i, dt);
-        ApplyEffects();
-        //ApplyConstantTemperatureFields();
+            ApplyEffects();
+        }
+        time += dt;
     }
 
 
@@ -346,7 +350,7 @@ public:
             for(std::size_t i = 0; i < enthalpy_data.size() ; ++i)
             {
                 if (isInfoToWrite(i, stride))
-                    vtk_file <<  enthalpy_data[i] << "\n";
+                    vtk_file << (float)enthalpy_data[i] << "\n";
             }
         }
         if (snapshot_settings.write_temperature)
@@ -356,7 +360,7 @@ public:
             for(std::size_t i = 0; i < enthalpy_data.size(); ++i)
             {
                 if (isInfoToWrite(i, stride))
-                    vtk_file <<  mesh.GetMaterialInfo(i).GetTByEnthalpy(enthalpy_data[i]) << "\n";
+                    vtk_file <<  (float)mesh.GetMaterialInfo(i).GetTByEnthalpy(enthalpy_data[i]) << "\n";
             }
         }
 
@@ -367,7 +371,7 @@ public:
             for(std::size_t i = 0; i < enthalpy_data.size(); ++i)
             {
                 if (isInfoToWrite(i, stride))
-                    vtk_file <<  mesh.GetMaterialInfo(i).GetThermalConductivityByE(enthalpy_data[i]) << "\n";
+                    vtk_file <<  (float)mesh.GetMaterialInfo(i).GetThermalConductivityByE(enthalpy_data[i]) << "\n";
             }
         }
 
@@ -388,7 +392,7 @@ public:
                         state = (T-mi.T1)/(mi.T2-mi.T1);
                     else
                         state = 1.0;
-                    vtk_file <<  state << "\n";
+                    vtk_file <<  (float)state << "\n";
                 }
             }
         }
@@ -410,7 +414,10 @@ public:
 
 
     friend class FixedTemperatureEffect<Dims>;
+    friend class SineTemperatureEffect<Dims>;
+
     friend class ChangeIndexOnMeltingEffect<Dims>;
+    friend class ChangeIndexOnFreezingEffect<Dims>;
 };
 
 

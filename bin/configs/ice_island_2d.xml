@@ -8,10 +8,11 @@
 			</Submesh>
 
 			<!-- Water -->	
-			<Submesh index="1" TPhase = "0.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+			<Submesh index="1" TPhase = "-2.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0">
 				<Effects>
-					<FixedTemperature temperature = "6.0"/>
+					<SineTemperature average = "3" amplitude = "4.5" period = "2000000" phaseShift = "0"/>
+					<ChangeIndexOnFreezing newIndex = "2"/>
 				</Effects>
 			</Submesh>
 
@@ -32,7 +33,7 @@
 			</Submesh>
 
 			<!-- Air -->
-			<Submesh index="4" TPhase = "-200.0" densityL = "1.3" densityS = "1.3" thermalConductivityL = "0.0" thermalConductivityS = "0.0243" 
+			<Submesh index="4" TPhase = "-200.0" densityL = "1.3" densityS = "1.3" thermalConductivityL = "0.0243" thermalConductivityS = "0.0243" 
 				specificHeatFusion = "1e9" specificHeatCapacityL = "1005.0" specificHeatCapacityS = "1005.0">
 				<Effects>
 					<FixedTemperature temperature = "6.0"/>
@@ -47,20 +48,20 @@
 	</Mesh>
 
 	<Snapshot>
-		<Period frames="500"/>
+		<Period frames="1000"/>
 		<Data fileName = "out/snapshot_iceisland<step>.vtk" stride="1 1" writeEnthalpy="true" writeTemperature="true" writeThermalElasticity="true" 
 			writeState="true"/>
 	</Snapshot>
 
-	<Task numberOfSteps = "50001" timeStep = "1000">
+	<Task numberOfSteps = "90001" timeStep = "500">
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>
 				<Submesh index="0" temperature="-3"/>
-				<Submesh index="1" temperature="10"/>
+				<Submesh index="1" temperature="3"/>
 				<Submesh index="2" temperature="-3"/>
 				<Submesh index="3" temperature="-3"/>
-				<Submesh index="4" temperature="12"/>
+				<Submesh index="4" temperature="6"/>
 			</PerSubmesh>
 		</IniState>
 	</Task>
