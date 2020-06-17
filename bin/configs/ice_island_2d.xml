@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Settings dimsCount = "2">
-	<Mesh meshFile="meshes/ice_island2d.tmesh">
+	<Mesh meshFile="meshes/ice_island2d.mesh">
 		<MediumParams>
 			<!-- Ground -->
 			<Submesh index="0" TPhase = "1000.0" densityL = "2000.0" densityS = "2000.0" thermalConductivityL = "1.1" thermalConductivityS = "1.1" 
@@ -8,34 +8,34 @@
 			</Submesh>
 
 			<!-- Water -->	
-			<Submesh index="1" TPhase = "273.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+			<Submesh index="1" TPhase = "0.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0">
 				<Effects>
-					<FixedTemperature temperature = "280"/>
-				</Effects>
-			</Submesh>
-
-			<!-- Ice over water level -->
-			<Submesh index="2" TPhase = "273.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
-				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0">
-				<Effects>
-					<ChangeIndexOnMelting newIndex = "4"/>
+					<FixedTemperature temperature = "6.0"/>
 				</Effects>
 			</Submesh>
 
 			<!-- Ice under water level -->
-			<Submesh index="3" TPhase = "273.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+			<Submesh index="2" TPhase = "0.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
 				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0">
 				<Effects>
 					<ChangeIndexOnMelting newIndex = "1"/>
 				</Effects>
 			</Submesh>
 
+			<!-- Ice over water level -->
+			<Submesh index="3" TPhase = "0.0" densityL = "1000.0" densityS = "920.0" thermalConductivityL = "0.591" thermalConductivityS = "2.22" 
+				specificHeatFusion = "334000.0" specificHeatCapacityL = "4200.0" specificHeatCapacityS = "1100.0">
+				<Effects>
+					<ChangeIndexOnMelting newIndex = "4"/>
+				</Effects>
+			</Submesh>
+
 			<!-- Air -->
-			<Submesh index="4" TPhase = "50.0" densityL = "1.3" densityS = "1.3" thermalConductivityL = "0.0243" thermalConductivityS = "0.0243" 
+			<Submesh index="4" TPhase = "-200.0" densityL = "1.3" densityS = "1.3" thermalConductivityL = "0.0" thermalConductivityS = "0.0243" 
 				specificHeatFusion = "1e9" specificHeatCapacityL = "1005.0" specificHeatCapacityS = "1005.0">
 				<Effects>
-					<FixedTemperature temperature = "290"/>
+					<FixedTemperature temperature = "6.0"/>
 				</Effects>
 			</Submesh>
 		</MediumParams>
@@ -44,15 +44,10 @@
 		<Boundaries>
 			<FixedFlux axis = "x" side = "0" flux = "0.0"/>
 		</Boundaries>
-
-		<Fields>
-			<FixedTemperature fieldFile="meshes/ice_island2d_water.tfield" temperature = "280"/>
-			<FixedTemperature fieldFile="meshes/ice_island2d_air.tfield" temperature = "290"/>
-		</Fields>
 	</Mesh>
 
 	<Snapshot>
-		<Period frames="200"/>
+		<Period frames="500"/>
 		<Data fileName = "out/snapshot_iceisland<step>.vtk" stride="1 1" writeEnthalpy="true" writeTemperature="true" writeThermalElasticity="true" 
 			writeState="true"/>
 	</Snapshot>
@@ -61,10 +56,11 @@
 		<IniState> 
 			<!-- <PerNode fileName = "meshes/example.temperature.data"/>> -->
 			<PerSubmesh>
-				<Submesh index="0" temperature="280"/>
-				<Submesh index="1" temperature="280"/>
-				<Submesh index="2" temperature="270"/>
-				<Submesh index="3" temperature="290"/>
+				<Submesh index="0" temperature="-3"/>
+				<Submesh index="1" temperature="10"/>
+				<Submesh index="2" temperature="-3"/>
+				<Submesh index="3" temperature="-3"/>
+				<Submesh index="4" temperature="12"/>
 			</PerSubmesh>
 		</IniState>
 	</Task>

@@ -40,7 +40,7 @@ void ReadInitialStateFile(std::string filename, std::array<int, Dims> nums, std:
 }
 
 template <int Dims>
-int Run(const Settings& settings)
+int Run(const Settings<Dims>& settings)
 {
     Solver<Dims> sol = Solver<Dims>(settings);
     for (int time_step_num = 0; time_step_num < settings.task_settings.number_of_steps; ++time_step_num)
@@ -75,15 +75,22 @@ int main(int argc, char** argv)
     }
     else
     {
-        Settings settings = ParseFile(std::string(argv[1]));
-        if (settings.dims_count == 2)
+        std::string config_filename = argv[1];
+        int dims_count = ReadDimsCountFromConfig(config_filename);
+
+        if (dims_count == 2)
         {
+            Settings<2> settings;
+            settings.ParseFile(config_filename);
             Run<2>(settings);
         }
-        else if (settings.dims_count == 3)
+        else if (dims_count == 3)
         {
+            Settings<3> settings;
+            settings.ParseFile(config_filename);
             Run<3>(settings);
         }
+        
     }
     return 0;
 }

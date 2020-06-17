@@ -30,7 +30,7 @@ private:
 
 
     // Submeshes
-    std::vector<std::vector<SubmeshEffect*>> submesh_effects;
+    std::vector<std::vector<SubmeshEffect<Dims>*>> submesh_effects;
 
     void SetEnthalpyByTData(const std::vector<double>& temperature_data)
     {
@@ -140,7 +140,14 @@ private:
 
     void ApplyEffects()
     {
-        
+        for (int id = 0; id < mesh.GetNumberOfNodes(); id++)
+        {
+            int material_index = mesh.GetMaterialIndex(id);
+            for (auto effect : submesh_effects[material_index])
+            {
+                effect->ApplyEffect(*this, id);
+            }
+        }
     }
 
 
@@ -173,7 +180,7 @@ private:
         f[num-1] = (boundary_conditions[2*axis+1][2] - boundary_conditions[2*axis+1][0] * beta);
     }
 
-    void InitFields(const Settings& settings)
+    void InitFields(const Settings<Dims>& settings)
     {
         for (int field = 0; field < settings.mesh_settings.field_settings_info.size(); field++)
         {
@@ -251,7 +258,7 @@ public:
         SetEnthalpyByTData(initial_temperatures);
     }
 
-    Solver(const Settings& settings)
+    Solver(const Settings<Dims>& settings)
     {
         // Init Mesh
         std::vector<MaterialInfo> material_infos;
@@ -272,11 +279,11 @@ public:
 
         // Init initial temperatures
         std::vector<double> initial_temperatures;
-        if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
+        if (settings.task_settings.initial_state_settings.type == Settings<Dims>::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode)
         {
             ReadInitialStateFile(settings.task_settings.initial_state_settings.initial_state_data_file, mesh.GetNums(), initial_temperatures);
         }
-        else if (settings.task_settings.initial_state_settings.type == Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
+        else if (settings.task_settings.initial_state_settings.type == Settings<Dims>::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh)
         {
             for (int i = 0; i < mesh.GetNumberOfNodes(); i++)
                 initial_temperatures.push_back(settings.task_settings.initial_state_settings.initial_temperatures_by_submesh[mesh.GetMaterialIndex(i)]);
@@ -293,24 +300,24 @@ public:
     }
 
 
+    const Mesh<Dims>& GetMesh()
+    {
+        return mesh;
+    }
 
-
-
-
-
-    
 
     void Step(double dt)
     {
         for (int i = 0; i < Dims; ++i)
             Step(i, dt);
-        ApplyConstantTemperatureFields();
+        ApplyEffects();
+        //ApplyConstantTemperatureFields();
     }
 
 
 
 
-    void SaveToVtk(const std::string name, const Settings::SnapshotSettings& snapshot_settings) const
+    void SaveToVtk(const std::string name, const typename Settings<Dims>::SnapshotSettings& snapshot_settings) const
     {
         std::array<int, Dims> nums = mesh.GetNums();
         std::vector<int> stride = snapshot_settings.stride;
@@ -393,7 +400,7 @@ public:
     {
         for (auto effect_vector : submesh_effects)
         {
-            for (SubmeshEffect* effect : effect_vector)
+            for (SubmeshEffect<Dims>* effect : effect_vector)
             {
                 delete effect;
             }
@@ -401,9 +408,16 @@ public:
         
     }
 
+
+    friend class FixedTemperatureEffect<Dims>;
+    friend class ChangeIndexOnMeltingEffect<Dims>;
 };
 
 
+double Min(double a, double b)
+{
+    return a < b ? a : b;
+}
 
 template<>
 void Solver<2>::IterateTridiagonal(int axis,
@@ -480,6 +494,9 @@ void Solver<2>::IterateTridiagonal(int axis,
                 const double central_thermal_conductivity_step = mi.GetThermalConductivityByE(E_step[0]);
                 const double kp = (mip1.GetThermalConductivityByE(E_iter[idx1_p]) + central_thermal_conductivity_iter) / 2.0;
                 const double km = (central_thermal_conductivity_iter + min1.GetThermalConductivityByE(E_iter[idx1_m])) / 2.0;
+
+                //const double kp = Min(mip1.GetThermalConductivityByE(E_iter[idx1_p]), central_thermal_conductivity_iter);
+                //const double km = Min(central_thermal_conductivity_iter, min1.GetThermalConductivityByE(E_iter[idx1_m]));
 
                 a[i1] = -coef1 * min1.GetAlpha(E_iter[idx1_m]) * km;
                 b[i1] = 1.0 + coef1 * mi.GetAlpha(E_iter[0]) * (km + kp);

@@ -74,14 +74,24 @@ public:
         return material_infos[material_indexes[global_id]];
     }
 
-    const int GetMaterialIndex(std::array<int, Dims> ids) const
+    int GetMaterialIndex(std::array<int, Dims> ids) const
     {
         return material_indexes[GetGlobalId(ids)];
     }
 
-    const int GetMaterialIndex(int global_id) const
+    int GetMaterialIndex(int global_id) const
     {
         return material_indexes[global_id];
+    }
+
+    void SetMaterialIndex(std::array<int, Dims> ids, int new_material_index)
+    {
+        material_indexes[GetGlobalId(ids)] = new_material_index;
+    }
+
+    void SetMaterialIndex(int global_id, int new_material_index)
+    {
+        material_indexes[global_id] = new_material_index;
     }
 
     inline std::array<double, Dims> GetLengths() const {return lengths;}
@@ -151,7 +161,7 @@ void Mesh<Dims>::ReadMeshFileBinary(std::string filename)
 template <int Dims>
 void Mesh<Dims>::ReadMeshFile(std::string filename)
 {
-    if (EndsWith(filename, ".tmesh"))
+    if (EndsWith(filename, ".mesh"))
     {
         ReadMeshFileAscii(filename);
     }

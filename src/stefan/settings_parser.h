@@ -12,10 +12,9 @@
 #include "submesh_effects.h"
 
 
-
+template <int Dims>
 struct Settings
 {
-    int dims_count;
     struct MeshSettings
     {
         std::string mesh_file;
@@ -26,8 +25,9 @@ struct Settings
             double thermal_conductivity_L, thermal_conductivity_S;
             double specific_heat_fusion, specific_heat_capacity_L, specific_heat_capacity_S;
             
-            std::vector<SubmeshEffect*> effects_info;
+            std::vector<SubmeshEffect<Dims>*> effects_info;
 
+            /*
             ~SubmeshSettings()
             {
                 for (auto effect : effects_info)
@@ -35,6 +35,7 @@ struct Settings
                     delete effect;
                 }
             }
+            */
         };
         std::vector<SubmeshSettings> submesh_settings_info;
         
@@ -90,13 +91,20 @@ struct Settings
             std::vector<double> initial_temperatures_by_submesh;
         } initial_state_settings;
     } task_settings;
+
+
+    void ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis);
+    void ParseSubmeshInfo(TiXmlElement* submesh_element, Settings<Dims>& settings);
+    void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings<Dims>& settings);
+    void ParseSnapshotInfo(TiXmlElement* snapshot_info_element, Settings<Dims>& settings);
+    void ParseTaskInfo(TiXmlElement* task_info_element, Settings<Dims>& settings);
+
+
+    void ParseFile(std::string xml_file_path);
 };
 
 
-Settings ParseFile(std::string xml_file_path);
-void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings);
-void ParseSnapshotInfo(TiXmlElement* snapshot_info_element, Settings& settings);
-void ParseTaskInfo(TiXmlElement* task_info_element, Settings& settings);
+
 
 template <typename T>
 int ParseVector(TiXmlElement* element, const std::string name, std::vector<T>* vector)
@@ -141,11 +149,9 @@ int ParseUnsigned(TiXmlElement* element, const std::string name, T* value)
 }
 
 
-Settings ParseFile(std::string xml_file_path)
+int ReadDimsCountFromConfig(std::string xml_file_path)
 {
-    Settings settings;
     TiXmlDocument xml_doc;
-
     if (!xml_doc.LoadFile(xml_file_path.c_str()))
     {
         std::cerr << "Error: Loading " << xml_file_path << " fails with following error: " <<
@@ -160,29 +166,57 @@ Settings ParseFile(std::string xml_file_path)
         std::exit(EXIT_FAILURE);
     }
 
-    if(xml_element->QueryIntAttribute("dimsCount", &settings.dims_count) != TIXML_SUCCESS)
+    int dims_count;
+    if(xml_element->QueryIntAttribute("dimsCount", &dims_count) != TIXML_SUCCESS)
     {
-        std::cerr << "Error: There is no dimsCount element \n";
+        std::cerr << "Error: There is no integer dimsCount element \n";
+        std::exit(EXIT_FAILURE);
+    }
+    if (dims_count != 2 && dims_count != 3)
+    {
+        std::cerr << "Error: dimsCount should be equal to 2 or 3 \n";
+        std::exit(EXIT_FAILURE);
+    }
+    return dims_count;
+}
+
+template <int Dims>
+void Settings<Dims>::ParseFile(std::string xml_file_path)
+{
+    
+    TiXmlDocument xml_doc;
+
+    if (!xml_doc.LoadFile(xml_file_path.c_str()))
+    {
+        std::cerr << "Error: Loading " << xml_file_path << " fails with following error: " <<
+            std::string(xml_doc.ErrorDesc()) << " in row " << xml_doc.ErrorRow() << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    TiXmlElement* xml_element = xml_doc.FirstChildElement("Settings");
+    if (!xml_element)
+    {
+        std::cerr << "Error: There is no Settings element in config file \n";
         std::exit(EXIT_FAILURE);
     }
 
     TiXmlElement* mesh_info_element = xml_element->FirstChildElement("Mesh");
     if (mesh_info_element)
     {
-        ParseMeshInfo(mesh_info_element, settings);
+        ParseMeshInfo(mesh_info_element, *this);
     } else
     {
-        std::cerr << "Error: Error: There is no Mesh section \n";
+        std::cerr << "Error: Error: There is no Mesh section in config file \n";
         std::exit(EXIT_FAILURE);
     }
 
     TiXmlElement* snapshot_info_element = xml_element->FirstChildElement("Snapshot");
     if (snapshot_info_element)
     {
-        ParseSnapshotInfo(snapshot_info_element, settings);
+        ParseSnapshotInfo(snapshot_info_element, *this);
     } else
     {
-        std::cerr << "Error: There is no Snapshot section \n";
+        std::cerr << "Error: There is no Snapshot section in config file \n";
         std::exit(EXIT_FAILURE);
     }
 
@@ -190,17 +224,17 @@ Settings ParseFile(std::string xml_file_path)
     TiXmlElement* task_info_element = xml_element->FirstChildElement("Task");
     if (task_info_element)
     {
-        ParseTaskInfo(task_info_element, settings);
+        ParseTaskInfo(task_info_element, *this);
     } else
     {
-        std::cerr << "Error: There is no Task section \n";
+        std::cerr << "Error: There is no Task section in config file \n";
         std::exit(EXIT_FAILURE);
     }
-    return settings;
-
 }
 
-void ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis)
+
+template <int Dims>
+void Settings<Dims>::ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis)
 {
     std::string axis_temp_string;
     ParseString(local_boundaries_element, "axis", &axis_temp_string);
@@ -218,9 +252,10 @@ void ParseBoundaryAxis(TiXmlElement* local_boundaries_element, int& axis)
 }
 
 
-void ParseSubmeshInfo(TiXmlElement* submesh_element, Settings& settings)
+template <int Dims>
+void Settings<Dims>::ParseSubmeshInfo(TiXmlElement* submesh_element, Settings<Dims>& settings)
 {
-    Settings::MeshSettings::SubmeshSettings temp_medium_params;
+    typename Settings<Dims>::MeshSettings::SubmeshSettings temp_medium_params;
     ParseScalar(submesh_element, "TPhase", &(temp_medium_params.T_phase));
     ParseScalar(submesh_element, "densityL", &(temp_medium_params.density_L));
     ParseScalar(submesh_element, "densityS", &(temp_medium_params.density_S));
@@ -236,7 +271,7 @@ void ParseSubmeshInfo(TiXmlElement* submesh_element, Settings& settings)
         TiXmlElement* fixed_temperature_effect_element = effect_element->FirstChildElement("FixedTemperature");
         if (fixed_temperature_effect_element)
         {
-            auto effect = new FixedTemperatureEffect();
+            auto effect = new FixedTemperatureEffect<Dims>();
             ParseScalar(fixed_temperature_effect_element, "temperature", &(effect->temperature));
             temp_medium_params.effects_info.push_back(effect);
         }
@@ -244,15 +279,16 @@ void ParseSubmeshInfo(TiXmlElement* submesh_element, Settings& settings)
         TiXmlElement* change_index_on_melting_effect_element = effect_element->FirstChildElement("ChangeIndexOnMelting");
         if (change_index_on_melting_effect_element)
         {
-            auto effect = new ChangeIndexOnMeltingEffect();
-            ParseUnsigned(change_index_on_melting_effect_element, "index", &(effect->index));
+            auto effect = new ChangeIndexOnMeltingEffect<Dims>();
+            ParseUnsigned(change_index_on_melting_effect_element, "newIndex", &(effect->index));
             temp_medium_params.effects_info.push_back(effect);
         }
     }
     settings.mesh_settings.submesh_settings_info.push_back(temp_medium_params);
 }
 
-void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
+template <int Dims>
+void Settings<Dims>::ParseMeshInfo(TiXmlElement* mesh_info_element, Settings<Dims>& settings)
 {
     ParseString(mesh_info_element, "meshFile", &settings.mesh_settings.mesh_file);
 
@@ -269,7 +305,7 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         };
     }
 
-    settings.mesh_settings.boundary_settings_info.resize(2 * settings.dims_count);
+    settings.mesh_settings.boundary_settings_info.resize(2 * Dims);
     // Setting default boundary conditions: fixed flux = 0.0
     for (int i = 0; i < settings.mesh_settings.boundary_settings_info.size(); ++i)
     {
@@ -282,8 +318,8 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         TiXmlElement * custom_boundaries_element = boundaries_element->FirstChildElement("Custom");
         while (custom_boundaries_element)
         {
-                Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-                temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::Custom;
+                typename Settings<Dims>::MeshSettings::BoundarySettings temp_boundary_setings;
+                temp_boundary_setings.type = Settings<Dims>::MeshSettings::BoundarySettings::BoundaryType::Custom;
                 ParseBoundaryAxis(custom_boundaries_element, temp_boundary_setings.axis);
                 ParseUnsigned(custom_boundaries_element, "side", &temp_boundary_setings.side);
                 std::vector<double> temp_vector;
@@ -296,8 +332,8 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         TiXmlElement* fixedflux_boundaries_element = boundaries_element->FirstChildElement("FixedFlux");
         while (fixedflux_boundaries_element)
         {
-            Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::FixedFlux;
+            typename Settings<Dims>::MeshSettings::BoundarySettings temp_boundary_setings;
+            temp_boundary_setings.type = Settings<Dims>::MeshSettings::BoundarySettings::BoundaryType::FixedFlux;
             ParseBoundaryAxis(fixedflux_boundaries_element, temp_boundary_setings.axis);
             ParseUnsigned(fixedflux_boundaries_element, "side", &temp_boundary_setings.side);
             double flux;
@@ -309,8 +345,8 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         TiXmlElement* fixedtemperature_boundaries_element = boundaries_element->FirstChildElement("FixedTemperature");
         while (fixedtemperature_boundaries_element)
         {
-            Settings::MeshSettings::BoundarySettings temp_boundary_setings;
-            temp_boundary_setings.type = Settings::MeshSettings::BoundarySettings::BoundaryType::FixedTemperature;
+            typename Settings<Dims>::MeshSettings::BoundarySettings temp_boundary_setings;
+            temp_boundary_setings.type = Settings<Dims>::MeshSettings::BoundarySettings::BoundaryType::FixedTemperature;
             ParseBoundaryAxis(fixedtemperature_boundaries_element, temp_boundary_setings.axis);
             ParseUnsigned(fixedtemperature_boundaries_element, "side", &temp_boundary_setings.side);
             double temperature;
@@ -321,13 +357,15 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
         }
     }
 
+
     TiXmlElement* fields_element = mesh_info_element->FirstChildElement("Fields");
     if (fields_element)
     {
         TiXmlElement* fixedtemperature_element = fields_element->FirstChildElement("FixedTemperature");
         while (fixedtemperature_element)
         {
-            settings.mesh_settings.field_settings_info.push_back(Settings::MeshSettings::FieldSettings());
+            // settings.mesh_settings.field_settings_info.push_back((typename Settings<Dims>::MeshSettings::FieldSettings)());
+            settings.mesh_settings.field_settings_info.resize(settings.mesh_settings.field_settings_info.size() + 1);
             int size = settings.mesh_settings.field_settings_info.size();
             ParseScalar(fixedtemperature_element, "temperature", &settings.mesh_settings.field_settings_info[size - 1].temperature);
             ParseString(fixedtemperature_element, "fieldFile", &settings.mesh_settings.field_settings_info[size - 1].field_filename);
@@ -337,7 +375,8 @@ void ParseMeshInfo(TiXmlElement* mesh_info_element, Settings& settings)
 }
 
 
-void ParseSnapshotInfo(TiXmlElement* snapshot_info_element, Settings& settings)
+template <int Dims>
+void Settings<Dims>::ParseSnapshotInfo(TiXmlElement* snapshot_info_element, Settings<Dims>& settings)
 {
     ParseUnsigned(snapshot_info_element->FirstChildElement("Period"), "frames", &settings.snapshot_settings_info.period_frames);
     TiXmlElement* snapshot_data_element = snapshot_info_element->FirstChildElement("Data");
@@ -350,7 +389,8 @@ void ParseSnapshotInfo(TiXmlElement* snapshot_info_element, Settings& settings)
 }
 
 
-void ParseTaskInfo(TiXmlElement* task_info_element, Settings& settings)
+template <int Dims>
+void Settings<Dims>::ParseTaskInfo(TiXmlElement* task_info_element, Settings<Dims>& settings)
 {
     ParseScalar(task_info_element, "timeStep", &(settings.task_settings.time_step));
     ParseUnsigned(task_info_element, "numberOfSteps", &(settings.task_settings.number_of_steps));
@@ -366,12 +406,12 @@ void ParseTaskInfo(TiXmlElement* task_info_element, Settings& settings)
     else if (ini_state_per_node_element)
     {
         settings.task_settings.initial_state_settings.type = 
-            Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode;
+            Settings<Dims>::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerNode;
         ParseString(ini_state_per_node_element, "fileName", &settings.task_settings.initial_state_settings.initial_state_data_file);
     }
     else if (ini_state_per_submesh_element)
     {
-        settings.task_settings.initial_state_settings.type = Settings::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh;
+        settings.task_settings.initial_state_settings.type = Settings<Dims>::TaskSettings::InitialStateSettings::InitialStateSettingsType::PerSubmesh;
         TiXmlElement * submesh_element = ini_state_per_submesh_element->FirstChildElement("Submesh");
         while (submesh_element)
         {
